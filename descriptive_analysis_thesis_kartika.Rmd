@@ -1,0 +1,1639 @@
+---
+title: "Thesis_Kartika"
+author: "Maria Kartika"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r}
+install.packages("tidyverse")
+library(tidyverse)
+```
+```{r}
+install.packages("haven")
+library(haven)
+install.packages("scales")
+library(scales)
+install.packages("ggplot2")
+library(ggplot2)
+install.packages("gtsummary")
+library(gtsummary)
+install.packages("janitor")
+library(janitor)
+```
+```{r}
+install.packages("readxl")
+library(readxl)
+```
+```{r}
+setwd("/Users/mariapkartika/Library/CloudStorage/OneDrive-HarvardUniversity/Research Tika/Kuisioner and Result")
+```
+```{r}
+data <- read_excel("questionnaire_result_cleaned_binary.xlsx")
+```
+```{r}
+# Get basic information about the dataset
+print("Dataset Dimensions:")
+print(dim(data))
+```
+```{r}
+data[data==99] <- NA
+```
+```{r}
+summary(data)
+```
+```{r}
+table(data$district)
+```
+```{r}
+freq_edulevel <- table(data$education_level)
+percent_edulevel <- round(freq_edulevel/sum(freq_edulevel)*100,2)
+
+result_edulevel  <-data.frame(
+ Frequency = freq_edulevel,
+ Percentage = percent_edulevel,
+ Total = sum(freq_edulevel)
+)
+ print(result_edulevel)
+
+```
+```{r}
+freq_occ <- table(data$occupation_level)
+percent_occ <- round(freq_occ/sum(freq_occ)*100, 2)
+
+result_occ  <-data.frame(
+ Frequency = freq_occ,
+ Percentage = percent_occ,
+ Total = sum(freq_occ)
+)
+ print(result_occ)
+```
+```{r}
+freq_marital <- table(data$marital_status)
+percent_marital <- round(freq_marital/sum(freq_marital)*100, 2)
+
+result_marital  <-data.frame(
+ Frequency = freq_marital,
+ Percentage = percent_marital,
+ Total = sum(freq_marital)
+)
+ print(result_marital)
+```
+```{r}
+
+data$age_group <- cut(data$age, 
+                     breaks = c(0, 15, 24, 34, Inf),
+                     labels = c("<16", "16-24", "25-34", "35+"))
+
+
+freq_age <- table(data$age_group)
+percent_age <- round(freq_age/sum(freq_age)*100, 2)
+result_age <- data.frame(
+ Frequency = freq_age,
+ Percentage = percent_age,
+ Total = sum(freq_age)
+)
+print(result_age)
+```
+```{r}
+data$age_first_childbirth_group <- cut(data$age_first_childbirth, 
+                     breaks = c(0, 19, 35, Inf),
+                     labels = c("<20", "20-35", "36+"))
+
+freq_age_first_child <- table(data$age_first_childbirth_group)
+percent_age_first_child <- round(freq_age_first_child/sum(freq_age_first_child)*100, 2)
+result_age_first_child <- data.frame(
+ Frequency = freq_age_first_child,
+ Percentage = percent_age_first_child,
+ Total = sum(freq_age_first_child)
+)
+print(result_age_first_child)
+```
+```{r}
+freq_religion <- table(data$religion)
+percent_religion <- round(freq_religion/sum(freq_religion)*100, 2)
+
+result_religion  <-data.frame(
+ Frequency = freq_religion,
+ Percentage = percent_religion,
+ Total = sum(freq_religion)
+)
+ print(result_religion)
+```
+```{r}
+data$ethnic_group_cat <- ifelse(data$ethnic_group %in% c("Miyah", "Abun", "Moi", "Mpur"), 
+                              "Indigenous Tambrauw",
+                              ifelse(data$ethnic_group == "Others", 
+                                    "Others", 
+                                    "Indigenous Papua non-Tambrauw"))
+
+freq_tambrauw <- table(data$ethnic_group[data$ethnic_group %in% c("Miyah", "Abun", "Moi", "Mpur")])
+percent_tambrauw <- round(freq_tambrauw/sum(freq_tambrauw)*100, 2)
+result_tambrauw <- data.frame(
+ Frequency = freq_tambrauw,
+ Percentage = percent_tambrauw,
+ Total = sum(freq_tambrauw)
+)
+print("Specific Indigenous Tambrauw Groups:")
+print(result_tambrauw)
+```
+```{r}
+freq_ethnic <- table(data$ethnic_group_cat)
+percent_ethnic <- round(freq_ethnic/sum(freq_ethnic)*100, 2)
+result_ethnic <- data.frame(
+ Frequency = freq_ethnic,
+ Percentage = percent_ethnic,
+ Total = sum(freq_ethnic)
+)
+print(result_ethnic)
+```
+```{r}
+freq_nonTambrauw <- table(data$ethnic_group[data$ethnic_group_cat == "Indigenous Papua non-Tambrauw"])
+percent_nonTambrauw <- round(freq_nonTambrauw/sum(freq_nonTambrauw)*100, 2)
+result_nonTambrauw <- data.frame(
+ Frequency = freq_nonTambrauw,
+ Percentage = percent_nonTambrauw,
+ Total = sum(freq_nonTambrauw)
+)
+print(result_nonTambrauw)
+```
+```{r}
+data$people_at_home_group <- cut(data$people_at_home, 
+                     breaks = c(0, 5, 10, Inf),
+                     labels = c("1-5", "6-10", "11+"))
+
+freq_people_at_home <- table(data$people_at_home_group)
+percent_people_at_home <- round(freq_people_at_home/sum(freq_people_at_home)*100, 2)
+result_people_at_home <- data.frame(
+ Frequency = freq_people_at_home,
+ Percentage = percent_people_at_home,
+ Total = sum(freq_people_at_home)
+)
+print(result_people_at_home)
+```
+```{r}
+data$total_bedroom_group <- cut(data$total_bedroom, 
+                     breaks = c(0, 2, 4, Inf),
+                     labels = c("1-2", "3-4", "5+"))
+
+freq_total_bedroom <- table(data$total_bedroom_group)
+percent_total_bedroom <- round(freq_total_bedroom/sum(freq_total_bedroom)*100, 2)
+result_total_bedroom <- data.frame(
+ Frequency = freq_total_bedroom,
+ Percentage = percent_total_bedroom,
+ Total = sum(freq_total_bedroom)
+)
+print(result_total_bedroom)
+```
+```{r}
+freq_source_water <- table(data$source_water)
+percent_source_water <- round(freq_source_water/sum(freq_source_water)*100, 2)
+result_source_water <- data.frame(
+ Frequency = freq_source_water,
+ Percentage = percent_source_water,
+ Total = sum(freq_source_water)
+)
+print(result_source_water)
+```
+```{r}
+freq_elec <- table(data$source_electricity)
+percent_elec <- round(freq_elec/sum(freq_elec)*100, 2)
+result_elec <- data.frame(
+ Frequency = freq_elec,
+ Percentage = percent_elec,
+ Total = sum(freq_elec)
+)
+print(result_elec)
+```
+```{r}
+freq_cook <- table(data$source_cooking)
+percent_cook <- round(freq_cook/sum(freq_cook)*100, 2)
+result_cook <- data.frame(
+ Frequency = freq_cook,
+ Percentage = percent_cook,
+ Total = sum(freq_cook)
+)
+print(result_cook)
+```
+```{r}
+freq_toilet <- table(data$type_toilet)
+percent_toilet <- round(freq_toilet/sum(freq_toilet)*100, 2)
+result_toilet <- data.frame(
+ Frequency = freq_toilet,
+ Percentage = percent_toilet,
+ Total = sum(freq_toilet)
+)
+print(result_toilet)
+```
+```{r}
+asset_vars <- c("asset_plot", "asset_refrigerator", "asset_tv", "asset_radio", 
+               "asset_hp", "asset_car", "asset_computer", "asset_bicycle", 
+               "asset_motorcycle", "asset_furniture", "asset_cooker", 
+               "asset_cattle", "asset_poultry", "asset_farm")
+
+asset_labels <- c("Land/Plot", "Refrigerator", "Television", "Radio", 
+                "Mobile Phone", "Car", "Computer", "Bicycle",
+                "Motorcycle", "Furniture", "Rice Cooker",
+                "Cattle", "Poultry", "Farm")
+
+for(i in 1:length(asset_vars)) {
+   freq_asset <- table(data[[asset_vars[i]]])
+   percent_asset <- round(freq_asset/sum(freq_asset)*100, 2)
+   result_asset <- data.frame(
+       Response = c("No", "Yes"),
+       Frequency = freq_asset,
+       Percentage = percent_asset,
+       Total = sum(freq_asset)
+   )
+   print(paste("\n", asset_labels[i], ":"))
+   print(result_asset)
+}
+```
+```{r}
+freq_mode_trans <- table(data$phc_mode_transportation)
+percent_mode_trans <- round(freq_mode_trans/sum(freq_mode_trans)*100, 2)
+result_mode_trans <- data.frame(
+ Frequency = freq_mode_trans,
+ Percentage = percent_mode_trans,
+ Total = sum(freq_mode_trans)
+)
+print(result_mode_trans)
+```
+```{r}
+table (data$phc_mode_transportation, data$`phc_travel distance`)
+```
+```{r}
+table_phc_trans <- table(data$phc_mode_transportation, data$`phc_travel distance`)
+prop_phc_trans <- round(prop.table(table_phc_trans)*100, 2)
+result_phc_trans <- matrix(paste(table_phc_trans, " (", prop_phc_trans, "%)", sep=""), 
+                     nrow=nrow(table_phc_trans))
+rownames(result_phc_trans) <- rownames(table_phc_trans)
+colnames(result_phc_trans) <- colnames(table_phc_trans)
+print(result_phc_trans)
+```
+```{r}
+data$phc_transport_cost_per_trip_group <- cut(data$phc_transport_cost_per_trip, 
+                     breaks = c(-Inf, 15000, 30000, 50000, Inf),
+                     labels = c("≤15,000", "16,000-30,000", "31,000-50,000", "≥51,000"))
+
+freq_phc_transport_cost_per_trip <- table(data$phc_transport_cost_per_trip_group)
+percent_phc_transport_cost_per_trip <- round(freq_phc_transport_cost_per_trip/sum(freq_phc_transport_cost_per_trip)*100, 2)
+result_phc_transport_cost_per_trip <- data.frame(
+ Frequency = freq_phc_transport_cost_per_trip,
+ Percentage = percent_phc_transport_cost_per_trip,
+ Total = sum(freq_phc_transport_cost_per_trip)
+)
+print(result_phc_transport_cost_per_trip)
+```
+```{r}
+data$monthly_income_group <- cut(data$monthly_household_income, 
+                     breaks = c(-Inf, 500000, 1500000, 3400000, Inf),
+                     labels = c("≤500,000", "500,001-1,500,000", "1,500,001-3,400,000", "≥3,400,001"))
+
+freq_monthly_income <- table(data$monthly_income_group)
+percent_monthly_income <- round(freq_monthly_income/sum(freq_monthly_income)*100, 2)
+result_monthly_income <- data.frame(
+ Frequency = freq_monthly_income,
+ Percentage = percent_monthly_income,
+ Total = sum(freq_monthly_income)
+)
+print(result_monthly_income)
+```
+```{r}
+data$dependent_group <- cut(data$dependents_supported_by_income, 
+                     breaks = c(0, 4, 10, Inf),
+                     labels = c("1-4", "5-10", "11+"))
+
+freq_dependent <- table(data$dependent_group)
+percent_dependent <- round(freq_dependent/sum(freq_dependent)*100, 2)
+result_dependent <- data.frame(
+ Frequency = freq_dependent,
+ Percentage = percent_dependent,
+ Total = sum(freq_dependent)
+)
+print(result_dependent)
+```
+```{r}
+freq_food_insecurity <- table(data$food_insecurity_three_month)
+percent_food_insecurity <- round(freq_food_insecurity/sum(freq_food_insecurity)*100, 2)
+result_food_insecurity <- data.frame(
+   Response = c("No", "Yes"),
+   Frequency = freq_food_insecurity,
+   Percentage = percent_food_insecurity,
+   Total = sum(freq_food_insecurity)
+)
+print(result_food_insecurity)
+```
+```{r}
+freq_foodhealthcare <- table(data$food_vs_treatment)
+percent_foodhealthcare <- round(freq_foodhealthcare/sum(freq_foodhealthcare)*100, 2)
+result_foodhealthcare <- data.frame(
+    Choice = names(freq_foodhealthcare),
+    Frequency = freq_foodhealthcare,
+    Percentage = percent_foodhealthcare,
+    Total = sum(freq_foodhealthcare)
+)
+print(result_foodhealthcare)
+```
+```{r}
+freq_pregnancy_anc <- table(data$pregnancy_anc)
+percent_pregnancy_anc <- round(freq_pregnancy_anc/sum(freq_pregnancy_anc)*100, 2)
+result_pregnancy_anc <- data.frame(
+   Response = c("No", "Yes"),
+   Frequency = freq_pregnancy_anc,
+   Percentage = percent_pregnancy_anc,
+   Total = sum(freq_pregnancy_anc)
+)
+print(result_pregnancy_anc)
+```
+```{r}
+# Remove "don't know" before calculations
+data_anc <- subset(data, total_anc_visit != "don't know")
+
+freq_anc_visit <- table(data_anc$total_anc_visit)
+percent_anc_visit <- round(freq_anc_visit/sum(freq_anc_visit)*100, 2)
+result_anc_visit <- data.frame(
+   Frequency = freq_anc_visit,
+   Percentage = percent_anc_visit,
+   Total = sum(freq_anc_visit)
+)
+print(result_anc_visit)
+```
+```{r}
+# Get total number of people who didn't do ANC
+total_reason_noanc <- freq_pregnancy_anc[1]  # The count of "No" responses
+
+# List all reason variables
+reason_noanc_vars <- c("reasonnoanc_no_money", 
+               "reasonnoanc_didnot_know_anc_schedule",
+               "reasonnoanc_poor_quality_care",
+               "reasonnoanc_disrespectful_unfriendly_provider",
+               "reasonnoanc_facility_far_from_home",
+               "reasonnoanc_dirty_facility",
+               "reasonnoanc_long_queue",
+               "reasonnoanc_inconvenient_opening_hours",
+               "reasonnoanc_inconvenient_closing_hours",
+               "reasonnoanc_prohibited_by_family",
+               "reasonnoanc_incomplete_service_facilities",
+               "reasonnoanc_unaware_of_pregnancy",
+               "reasonnoanc_chose_not_do_anc",
+               "reasonnoanc_pregnant_out_of_wedlock")
+
+# Create labels for more readable output
+reason_noanc_labels <- c("No money",
+                 "Did not know ANC schedule",
+                 "Poor quality care",
+                 "Disrespectful/unfriendly provider",
+                 "Facility far from home",
+                 "Dirty facility",
+                 "Long queue",
+                 "Inconvenient opening hours",
+                 "Inconvenient closing hours",
+                 "Prohibited by family",
+                 "Incomplete service facilities",
+                 "Unaware of pregnancy",
+                 "Chose not to do ANC",
+                 "Pregnant out of wedlock")
+
+# Calculate frequency and percentage for each reason
+results <- data.frame(
+   Reason = reason_noanc_labels,
+   Frequency = numeric(length(reason_noanc_vars)),
+   Percentage = numeric(length(reason_noanc_vars))
+)
+
+for(i in 1:length(reason_noanc_vars)) {
+   freq <- sum(data[data$pregnancy_anc == 0, reason_noanc_vars[i]], na.rm = TRUE)
+   results$Frequency[i] <- freq
+   results$Percentage[i] <- round((freq/total_reason_noanc)*100, 2)
+}
+
+print(results)
+```
+```{r}
+# Get total number of people who did ANC
+total_choose_anc <- freq_pregnancy_anc[2]  # The count of "Yes" responses
+
+# List all reason variables
+reason_choose_anc_vars <- c("choose_anc_affordable_cost",
+               "choose_anc_good_quality_care",
+               "choose_anc_respectful_friendly_provider",
+               "choose_anc_facility_close_to_home",
+               "choose_anc_clean_anc_facility",
+               "choose_anc_convenient_operating_hours",
+               "choose_anc_family_suggested_facility",
+               "choose_anc_comprehensive_services",
+               "choose_anc_good_service_reputation",
+               "choose_anc_complete_medications",
+               "choose_anc_personal_connection_with_provider",
+               "choose_anc_preference_for_female_doctor",
+               "choose_anc_other_reasons")
+
+# Create labels for more readable output
+reason_choose_anc_labels <- c("Affordable cost",
+                 "Good quality care",
+                 "Respectful/friendly provider",
+                 "Facility close to home",
+                 "Clean ANC facility",
+                 "Convenient operating hours",
+                 "Family suggested facility",
+                 "Comprehensive services",
+                 "Good service reputation",
+                 "Complete medications",
+                 "Personal connection with provider",
+                 "Preference for female doctor",
+                 "Other reasons")
+
+# Calculate frequency and percentage for each reason
+results <- data.frame(
+   Reason = reason_choose_anc_labels,
+   Frequency = numeric(length(reason_choose_anc_vars)),
+   Percentage = numeric(length(reason_choose_anc_vars))
+)
+
+for(i in 1:length(reason_choose_anc_vars)) {
+   freq <- sum(data[data$pregnancy_anc == 1, reason_choose_anc_vars[i]], na.rm = TRUE)
+   results$Frequency[i] <- freq
+   results$Percentage[i] <- round((freq/total_choose_anc)*100, 2)
+}
+
+print(results)
+```
+```{r}
+freq_anc_place <- table(data$name_anc_facility)
+percent_anc_place <- round(freq_anc_place/sum(freq_anc_place)*100, 2)
+result_anc_place <- data.frame(
+   Frequency = freq_anc_place,
+   Percentage = percent_anc_place,
+   Total = sum(freq_anc_place)
+)
+print(result_anc_place)
+```
+```{r}
+
+data_first_anc <- subset(data, month_pregnancy_first_anc_visit != "don't know")
+
+freq_first_anc <- table(data_first_anc$month_pregnancy_first_anc_visit)
+percent_first_anc <- round(freq_first_anc/sum(freq_first_anc)*100, 2)
+result_first_anc <- data.frame(
+   Frequency = freq_first_anc,
+   Percentage = percent_first_anc,
+   Total = sum(freq_first_anc)
+)
+print(result_first_anc)
+```
+```{r}
+freq_referral_anc <- table(data$referral_anc)
+percent_referral_anc <- round(freq_referral_anc/sum(freq_referral_anc)*100, 2)
+result_referral_anc <- data.frame(
+   Response = c("No", "Yes"),
+   Frequency = freq_referral_anc,
+   Percentage = percent_referral_anc,
+   Total = sum(freq_referral_anc)
+)
+print(result_referral_anc)
+```
+```{r}
+# Get total number of people who were referred
+total_anc_referred <- freq_referral_anc[2]  # The count of "Yes" responses (66)
+
+# List all referral reason variables 
+reason_anc_referred_vars <- c("referral_reason_check_usg",
+               "referral_reason_check_lab", 
+               "referral_reason_abnormal_fetal_position",
+               "referral_reason_underlying_disease",
+               "referral_reason_old_mom",
+               "referral_reason_lot_children", 
+               "referral_reason_birth_interval",
+               "referral_reason_young_mom",
+               "referral_reason_maternal_underweight",
+               "referral_reason_maternal_overweight",
+               "referral_reason_maternal_underheight",
+               "referral_reason_others")
+
+# Create labels for more readable output
+reason_anc_referred_labels <- c("Check USG",
+                 "Check Lab",
+                 "Abnormal fetal position", 
+                 "Underlying disease",
+                 "Old mom",
+                 "Lot of children",
+                 "Birth interval",
+                 "Young mom", 
+                 "Maternal underweight",
+                 "Maternal overweight",
+                 "Maternal underheight",
+                 "Others")
+
+# Calculate frequency and percentage for each reason
+results_anc_referred <- data.frame(
+   Reason = reason_anc_referred_labels,
+   Frequency = numeric(length(reason_anc_referred_vars)),
+   Percentage = numeric(length(reason_anc_referred_vars))
+)
+
+for(i in 1:length(reason_anc_referred_vars)) {
+   freq <- sum(data[data$referral_anc == 1, reason_anc_referred_vars[i]], na.rm = TRUE)
+   results_anc_referred$Frequency[i] <- freq
+   results_anc_referred$Percentage[i] <- round((freq/total_anc_referred)*100, 2)
+}
+
+print(results_anc_referred)
+```
+```{r}
+freq_anc_same_facility <- table(data$same_facility_as_previous_anc)
+percent_anc_same_facility <- round(freq_anc_same_facility/sum(freq_anc_same_facility)*100, 2)
+result_anc_same_facility <- data.frame(
+   Response = names(freq_anc_same_facility),
+   Frequency = freq_anc_same_facility,
+   Percentage = percent_anc_same_facility,
+   Total = sum(freq_anc_same_facility)
+)
+print(result_anc_same_facility)
+```
+```{r}
+# Get total number of people who changed facilities
+total_change_anc <- freq_anc_same_facility["no"]  # The count of "No" responses
+
+# List all change reason variables
+reason_change_anc_vars <- c("change_anc_no_money",
+               "change_anc_forgot_appointment",
+               "change_anc_poor_quality_care",
+               "change_anc_disrespectful_unfriendly_provider",
+               "change_anc_far_from_home",
+               "change_anc_dirty_facility",
+               "change_anc_long_queue",
+               "change_anc_inconvenient_opening_hours",
+               "change_anc_inconvenient_closing_hours",
+               "change_anc_relocated_residence",
+               "change_anc_inadequate_healthcare_facility",
+               "change_anc_no_personal_connection",
+               "change_anc_others")
+
+# Create labels for more readable output
+reason_change_anc_labels <- c("No money",
+                 "Forgot appointment",
+                 "Poor quality care",
+                 "Disrespectful/unfriendly provider",
+                 "Far from home",
+                 "Dirty facility",
+                 "Long queue",
+                 "Inconvenient opening hours",
+                 "Inconvenient closing hours",
+                 "Relocated residence",
+                 "Inadequate healthcare facility",
+                 "No personal connection",
+                 "Others")
+
+# Calculate frequency and percentage for each reason
+results_change_anc <- data.frame(
+   Reason = reason_change_anc_labels,
+   Frequency = numeric(length(reason_change_anc_vars)),
+   Percentage = numeric(length(reason_change_anc_vars))
+)
+
+for(i in 1:length(reason_change_anc_vars)) {
+   freq <- sum(data[data$same_facility_as_previous_anc == "no", reason_change_anc_vars[i]], na.rm = TRUE)
+   results_change_anc$Frequency[i] <- freq
+   results_change_anc$Percentage[i] <- round((freq/total_change_anc)*100, 2)
+}
+
+print(results_change_anc)
+```
+```{r}
+# Blood pressure
+data_bp <- subset(data, anc_blood_pressure != "don't know")
+freq_bp <- table(data_bp$anc_blood_pressure)
+percent_bp <- round(prop.table(freq_bp)*100, 2)
+result_bp <- data.frame(
+   Response = names(freq_bp),
+   Frequency = freq_bp,
+   Percentage = percent_bp,
+   Total = sum(freq_bp)
+)
+print("Blood Pressure Measurement:")
+print(result_bp)
+
+# Urine check
+data_urine <- subset(data, anc_urine_check != "don't know")
+freq_urine <- table(data_urine$anc_urine_check)
+percent_urine <- round(prop.table(freq_urine)*100, 2)
+result_urine <- data.frame(
+   Response = names(freq_urine),
+   Frequency = freq_urine,
+   Percentage = percent_urine,
+   Total = sum(freq_urine)
+)
+print("\nUrine Check:")
+print(result_urine)
+
+# Blood check
+data_blood <- subset(data, anc_blood_check != "don't know")
+freq_blood <- table(data_blood$anc_blood_check)
+percent_blood <- round(prop.table(freq_blood)*100, 2)
+result_blood <- data.frame(
+   Response = names(freq_blood),
+   Frequency = freq_blood,
+   Percentage = percent_blood,
+   Total = sum(freq_blood)
+)
+print("\nBlood Check:")
+print(result_blood)
+
+
+```
+
+
+```{r}
+# Weight check
+data_weight <- subset(data, `anc_ weight_check` != "don't know")
+freq_weight <- table(data_weight$`anc_ weight_check`)
+percent_weight <- round(prop.table(freq_weight)*100, 2)
+result_weight <- data.frame(
+   Response = names(freq_weight),
+   Frequency = freq_weight,
+   Percentage = percent_weight,
+   Total = sum(freq_weight)
+)
+print("\nWeight Measurement:")
+print(result_weight)
+
+# Danger signs
+data_danger <- subset(data, danger_signs_explained != "don't know")
+freq_danger <- table(data_danger$danger_signs_explained)
+percent_danger <- round(prop.table(freq_danger)*100, 2)
+result_danger <- data.frame(
+   Response = names(freq_danger),
+   Frequency = freq_danger,
+   Percentage = percent_danger,
+   Total = sum(freq_danger)
+)
+print("\nDanger Signs Explained:")
+print(result_danger)
+```
+```{r}
+freq_decision_maker_anc <- table(data$decision_maker_anc)
+percent_decision_maker_anc <- round(prop.table(freq_decision_maker_anc)*100, 2)
+result_decision_maker_anc <- data.frame(
+   Response = names(freq_decision_maker_anc),
+   Frequency = freq_decision_maker_anc,
+   Percentage = percent_decision_maker_anc,
+   Total = sum(freq_decision_maker_anc)
+)
+print(result_decision_maker_anc)
+```
+```{r}
+freq_who_paid_anc_cost <- table(data$who_paid_anc_cost)
+percent_who_paid_anc_cost <- round(prop.table(freq_who_paid_anc_cost)*100, 2)
+result_who_paid_anc_cost <- data.frame(
+   Response = names(freq_who_paid_anc_cost),
+   Frequency = freq_who_paid_anc_cost,
+   Percentage = percent_who_paid_anc_cost,
+   Total = sum(freq_who_paid_anc_cost)
+)
+print(result_who_paid_anc_cost)
+```
+```{r}
+freq_highest_cost_anc <- table(data$highest_cost_anc)
+percent_highest_cost_anc <- round(prop.table(freq_highest_cost_anc)*100, 2)
+result_highest_cost_anc <- data.frame(
+   Response = names(freq_highest_cost_anc),
+   Frequency = freq_highest_cost_anc,
+   Percentage = percent_highest_cost_anc,
+   Total = sum(freq_highest_cost_anc)
+)
+print(result_highest_cost_ancHighes)
+```
+```{r}
+result_anc_cost_service <- summary(data$anc_cost_service[!is.na(data$anc_cost_service)])
+print("\nANC Service Cost Range:")
+print(paste("Min: Rp.", min(data$anc_cost_service, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$anc_cost_service, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$anc_cost_service, na.rm=TRUE), 2)))
+
+
+```
+```{r}
+# Transportation cost
+resul_anc_cost_transportation <- summary(data$anc_cost_transportation[!is.na(data$anc_cost_transportation)])
+print("\nANC Transportation Cost Range:")
+print(paste("Min: Rp.", min(data$anc_cost_transportation, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$anc_cost_transportation, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$anc_cost_transportation, na.rm=TRUE), 2)))
+
+```
+```{r}
+# Medicine cost
+result_anc_cost_meds <- summary(data$anc_cost_meds[!is.na(data$anc_cost_meds)])
+print("\nANC Medicine Cost Range:")
+print(paste("Min: Rp.", min(data$anc_cost_meds, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$anc_cost_meds, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$anc_cost_meds, na.rm=TRUE), 2)))
+```
+```{r}
+result_anc_cost_lab <- summary(data$anc_cost_lab[!is.na(data$anc_cost_lab)])
+print("\nANC Laboratory Cost Range:")
+print(paste("Min: Rp.", min(data$anc_cost_lab, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$anc_cost_lab, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$anc_cost_lab, na.rm=TRUE), 2)))
+
+# Other costs
+result_anc_cost_others <- summary(data$anc_cost_others_detail[!is.na(data$anc_cost_others_detail)])
+print("\nANC Other Costs Range:")
+print(paste("Min: Rp.", min(data$anc_cost_others_detail, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$anc_cost_others_detail, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$anc_cost_others_detail, na.rm=TRUE), 2)))
+```
+```{r}
+freq_location_birth <- table(data$location_last_childbirth)
+percent_location_birth <- round(prop.table(freq_location_birth)*100, 2)
+result_location_birth <- data.frame(
+   Response = names(freq_location_birth),
+   Frequency = freq_location_birth,
+   Percentage = percent_location_birth,
+   Total = sum(freq_location_birth)
+)
+print(result_location_birth)
+```
+```{r}
+home_delivery_categories <- c("at home alone", 
+                    "at home with healthcare provider", 
+                    "at home with someone else",
+                    "at home with traditional birth attendance",
+                    "at midwife's home")
+
+total_home_deliveries <- sum(table(data$location_last_childbirth)[home_delivery_categories])
+
+reason_home_delivery_vars <- c("delivery_home_lack_of_money",
+                    "delivery_home_felt_safe_home_delivery",
+                    "delivery_home_facility_no_delivery_services",
+                    "delivery_home_facility_too_far",
+                    "delivery_home_cultural_value",
+                    "delivery_home_inadequate_facility_services",
+                    "delivery_home_unaware_operating_hours",
+                    "delivery_home_miscalculated_due_date",
+                    "delivery_home_sudden_labour",
+                    "delivery_home_preferance_for_known_setting",
+                    "delivery_home_closeness_to_family_provider",
+                    "delivery_home_choose_home_delivery",
+                    "delivery_home_poor_quality_care",
+                    "delivery_home_dirty_facility",
+                    "delivery_home_disrespectful_unfriendly_provider")
+
+reason_home_delivery_labels <- c("Lack of money",
+                      "Felt safe with home delivery",
+                      "Facility has no delivery services",
+                      "Facility too far",
+                      "Cultural value",
+                      "Inadequate facility services",
+                      "Unaware of operating hours",
+                      "Miscalculated due date",
+                      "Sudden labour",
+                      "Preference for known setting",
+                      "Closeness to family/provider",
+                      "Chose home delivery",
+                      "Poor quality care",
+                      "Dirty facility",
+                      "Disrespectful/unfriendly provider")
+
+result_reason_home_delivery <- data.frame(
+   Reason = reason_home_delivery_labels,
+   Frequency = numeric(length(reason_home_delivery_vars)),
+   Percentage = numeric(length(reason_home_delivery_vars))
+)
+
+for(i in 1:length(reason_home_delivery_vars)) {
+    freq <- sum(data[data$location_last_childbirth %in% home_delivery_categories, reason_home_delivery_vars[i]], na.rm = TRUE)
+    result_reason_home_delivery$Frequency[i] <- freq
+    result_reason_home_delivery$Percentage[i] <- round((freq/total_home_deliveries)*100, 2)
+}
+
+print(result_reason_home_delivery)
+```
+```{r}
+print(table(data$location_last_childbirth))
+```
+```{r}
+reason_home_delivery_vars <- c("delivery_home_lack_of_money",
+                    "delivery_home_felt_safe_home_delivery",
+                    "delivery_home_facility_no_delivery_services",
+                    "delivery_home_facility_too_far",
+                    "delivery_home_cultural_value",
+                    "delivery_home_inadequate_facility_services",
+                    "delivery_home_unaware_operating_hours",
+                    "delivery_home_miscalculated_due_date",
+                    "delivery_home_sudden_labour",
+                    "delivery_home_preferance_for_known_setting",
+                    "delivery_home_closeness_to_family_provider",
+                    "delivery_home_choose_home_delivery",
+                    "delivery_home_poor_quality_care",
+                    "delivery_home_dirty_facility",
+                    "delivery_home_disrespectful_unfriendly_provider")
+
+reason_home_delivery_labels <- c("Lack of money",
+                      "Felt safe with home delivery",
+                      "Facility has no delivery services",
+                      "Facility too far",
+                      "Cultural value",
+                      "Inadequate facility services",
+                      "Unaware of operating hours",
+                      "Miscalculated due date",
+                      "Sudden labour",
+                      "Preference for known setting",
+                      "Closeness to family/provider",
+                      "Chose home delivery",
+                      "Poor quality care",
+                      "Dirty facility",
+                      "Disrespectful/unfriendly provider")
+
+result_reason_home_delivery <- data.frame(
+   Reason = reason_home_delivery_labels,
+   Frequency = numeric(length(reason_home_delivery_vars)),
+   Percentage = numeric(length(reason_home_delivery_vars))
+)
+
+for(i in 1:length(reason_home_delivery_vars)) {
+    freq <- sum(data[data$location_last_childbirth %in% home_delivery_categories, reason_home_delivery_vars[i]], na.rm = TRUE)
+    result_reason_home_delivery$Frequency[i] <- freq
+    result_reason_home_delivery$Percentage[i] <- round((freq/total_home_deliveries)*100, 2)
+}
+
+print(result_reason_home_delivery)
+```
+```{r}
+# Define categories and variables as before
+hf_categories <- c("at hospital", "at puskesmas")
+total_hf_deliveries <- sum(table(data$location_child_birth)[hf_categories])
+
+reason_hf_delivery_vars <- c("delivery_hf_affordable_cost",
+                    "delivery_hf_quality_care",
+                    "delivery_hf_respectful_kind_provider",
+                    "delivery_hf_facility_close_to_home",
+                    "delivery_hf_clean_delivery_facility",
+                    "delivery_hf_delivery_facility_24_hours",
+                    "delivery_hf_family_recommended_facility",
+                    "delivery_hf_comprehensive_services",
+                    "delivery_hf_good_facility_reputation",
+                    "delivery_hf_complete_medication",
+                    "delivery_hf_location_based_decision",
+                    "delivery_hf_referrals",
+                    "delivery_hf_closeness_to_provider",
+                    "delivery_hf_others")
+
+reason_hf_delivery_labels <- c("Affordable cost",
+                    "Quality care",
+                    "Respectful kind provider",
+                    "Facility close to home",
+                    "Clean delivery facility",
+                    "Delivery facility 24_hours",
+                    "Family recommended facility",
+                    "Comprehensive services",
+                    "Good facility reputation",
+                    "Complete medication",
+                    "Location based decision",
+                    "Referrals",
+                    "Closeness to provider",
+                    "Others")
+
+# Create the results dataframe
+result_reason_hf_delivery <- data.frame(
+    Reason = reason_hf_delivery_labels,
+    Frequency = numeric(length(reason_hf_delivery_vars)),
+    Percentage = numeric(length(reason_hf_delivery_vars))
+)
+
+# Calculate frequencies and percentages
+for(i in 1:length(reason_hf_delivery_vars)) {
+    freq <- sum(data[data$location_last_childbirth %in% hf_categories, reason_hf_delivery_vars[i]], na.rm = TRUE)
+    result_reason_hf_delivery$Frequency[i] <- freq
+    result_reason_hf_delivery$Percentage[i] <- round((freq/total_hf_deliveries)*100, 2)
+}
+```
+
+```{r}
+hf_categories <- c("at hospital", "at puskesmas")
+total_hf_deliveries <- sum(table(data$location_last_childbirth)[hf_categories], na.rm = TRUE)
+
+reason_hf_delivery_vars <- c("delivery_hf_affordable_cost",
+                    "delivery_hf_quality_care",
+                    "delivery_hf_respectful_kind_provider",
+                    "delivery_hf_facility_close_to_home",
+                    "delivery_hf_clean_delivery_facility",
+                    "delivery_hf_delivery_facility_24_hours",
+                    "delivery_hf_family_recommended_facility",
+                    "delivery_hf_comprehensive_services",
+                    "delivery_hf_good_facility_reputation",
+                    "delivery_hf_complete_medication",
+                    "delivery_hf_location_based_decision",
+                    "delivery_hf_referrals",
+                    "delivery_hf_closeness_to_provider",
+                    "delivery_hf_others")
+
+reason_hf_delivery_labels <- c("Affordable cost",
+                    "Quality care",
+                    "Respectful kind provider",
+                    "Facility close to home",
+                    "Clean delivery facility",
+                    "Delivery facility 24_hours",
+                    "Family recommended facility",
+                    "Comprehensive services",
+                    "Good facility reputation",
+                    "Complete medication",
+                    "Location based decision",
+                    "Referrals",
+                    "Closeness to provider",
+                    "Others")
+
+result_reason_hf_delivery <- data.frame(
+   Reason = reason_hf_delivery_labels,
+   Frequency = numeric(length(reason_hf_delivery_vars)),
+   Percentage = numeric(length(reason_hf_delivery_vars))
+)
+
+for (i in 1:length(reason_hf_delivery_vars)) {
+    freq <- sum(data[data$location_last_childbirth %in% hf_categories, reason_hf_delivery_vars[i]], na.rm = TRUE)
+    result_reason_hf_delivery$Frequency[i] <- freq
+    if (!is.na(total_hf_deliveries) && total_hf_deliveries > 0) {
+        result_reason_hf_delivery$Percentage[i] <- round((freq/total_hf_deliveries)*100, 2)
+    } else {
+        result_reason_hf_delivery$Percentage[i] <- NA
+    }
+}
+print (result_reason_hf_delivery)
+```
+```{r}
+freq_delivery_assistant <- table(data$delivery_assistant)
+percent_delivery_assistant <- round(prop.table(freq_delivery_assistant)*100, 2)
+result_delivery_assistant <- data.frame(
+   Response = names(freq_delivery_assistant),
+   Frequency = freq_delivery_assistant,
+   Percentage = percent_delivery_assistant,
+   Total = sum(freq_delivery_assistant)
+)
+print(result_delivery_assistant)
+```
+```{r}
+# View unique responses in other_delivery_assistant
+table(data$other_delivery_assistant)
+```
+```{r}
+freq_other_assist <- table(data$other_delivery_assistant)
+percent_other_assist <- round(prop.table(freq_other_assist)*100, 2)
+result_other_assist <- data.frame(
+   Response = names(freq_other_assist),
+   Frequency = freq_other_assist,
+   Percentage = percent_other_assist,
+   Total = sum(freq_other_assist)
+)
+print(result_other_assist)
+```
+```{r}
+freq_highest_cost_delivery <- table(data$highest_cost_delivery)
+percent_highest_cost_delivery <- round(prop.table(freq_highest_cost_delivery)*100, 2)
+result_highest_cost_delivery <- data.frame(
+   Response = names(freq_highest_cost_delivery),
+   Frequency = freq_highest_cost_delivery,
+   Percentage = percent_highest_cost_delivery,
+   Total = sum(freq_highest_cost_delivery)
+)
+print(result_highest_cost_delivery)
+```
+```{r}
+# Health Facility Delivery Costs
+# Service cost at health facility
+service_hf <- summary(data$delivery_hf_cost_service[!is.na(data$delivery_hf_cost_service)])
+print("\nDelivery at Health Facility - Service Cost Range:")
+print(paste("Min: Rp.", min(data$delivery_hf_cost_service, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_hf_cost_service, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_hf_cost_service, na.rm=TRUE), 2)))
+
+# Medicine cost at health facility
+meds_hf <- summary(data$delivery_hf_cost_meds[!is.na(data$delivery_hf_cost_meds)])
+print("\nDelivery at Health Facility - Medicine Cost Range:")
+print(paste("Min: Rp.", min(data$delivery_hf_cost_meds, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_hf_cost_meds, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_hf_cost_meds, na.rm=TRUE), 2)))
+
+# Transportation cost at health facility
+trans_hf <- summary(data$delivery_hf_cost_transportation[!is.na(data$delivery_hf_cost_transportation)])
+print("\nDelivery at Health Facility - Transportation Cost Range:")
+print(paste("Min: Rp.", min(data$delivery_hf_cost_transportation, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_hf_cost_transportation, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_hf_cost_transportation, na.rm=TRUE), 2)))
+
+# Lab cost at health facility
+lab_hf <- summary(data$delivery_hf_cost_lab[!is.na(data$delivery_hf_cost_lab)])
+print("\nDelivery at Health Facility - Laboratory Cost Range:")
+print(paste("Min: Rp.", min(data$delivery_hf_cost_lab, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_hf_cost_lab, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_hf_cost_lab, na.rm=TRUE), 2)))
+
+# Other costs at health facility
+others_hf <- summary(data$delivery_hf_others_by_numbers[!is.na(data$delivery_hf_others_by_numbers)])
+print("\nDelivery at Health Facility - Other Costs Range:")
+print(paste("Min: Rp.", min(data$delivery_hf_others_by_numbers, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_hf_others_by_numbers, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_hf_others_by_numbers, na.rm=TRUE), 2)))
+
+# Home Delivery Costs
+# Service cost at home
+service_home <- summary(data$delivery_home_cost_service[!is.na(data$delivery_home_cost_service)])
+print("\nDelivery at Home - Service Cost Range:")
+print(paste("Min: Rp.", min(data$delivery_home_cost_service, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_home_cost_service, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_home_cost_service, na.rm=TRUE), 2)))
+
+
+```
+```{r}
+# Check data type and content for each variable
+print("Health Facility Costs:")
+print(str(data$delivery_hf_cost_lab))
+print(str(data$delivery_hf_others_by_numbers))
+
+print("\nHome Delivery Costs:")
+print(str(data$delivery_home_cost_meds))
+print(str(data$delivery_home_cost_transportation))
+print(str(data$delivery_home_cost_lab))
+print(str(data$delivery_home_others_by_numbers))
+```
+```{r}
+# Medicine cost at home
+meds_home <- summary(data$delivery_home_cost_meds[!is.na(data$delivery_home_cost_meds)])
+print("\nDelivery at Home - Medicine Cost Range:")
+print(paste("Min: Rp.", min(data$delivery_home_cost_meds, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_home_cost_meds, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_home_cost_meds, na.rm=TRUE), 2)))
+
+# Transportation cost at home
+trans_home <- summary(data$delivery_home_cost_transportation[!is.na(data$delivery_home_cost_transportation)])
+print("\nDelivery at Home - Transportation Cost Range:")
+print(paste("Min: Rp.", min(data$delivery_home_cost_transportation, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_home_cost_transportation, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_home_cost_transportation, na.rm=TRUE), 2)))
+
+# Lab cost at home
+lab_home <- summary(data$delivery_home_cost_lab[!is.na(data$delivery_home_cost_lab)])
+print("\nDelivery at Home - Laboratory Cost Range:")
+print(paste("Min: Rp.", min(data$delivery_home_cost_lab, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_home_cost_lab, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_home_cost_lab, na.rm=TRUE), 2)))
+
+# Other costs at home
+others_home <- summary(data$delivery_home_others_by_numbers[!is.na(data$delivery_home_others_by_numbers)])
+print("\nDelivery at Home - Other Costs Range:")
+print(paste("Min: Rp.", min(data$delivery_home_others_by_numbers, na.rm=TRUE)))
+print(paste("Max: Rp.", max(data$delivery_home_others_by_numbers, na.rm=TRUE)))
+print(paste("Mean: Rp.", round(mean(data$delivery_home_others_by_numbers, na.rm=TRUE), 2)))
+```
+```{r}
+# Function to safely calculate statistics
+get_cost_stats <- function(x, label) {
+  if(all(is.na(x))) {
+    print(paste("\n", label, ": No data available"))
+  } else {
+    valid_data <- x[!is.na(x)]
+    if(length(valid_data) > 0) {
+      print(paste("\n", label, ":"))
+      print(paste("Min: Rp.", min(valid_data)))
+      print(paste("Max: Rp.", max(valid_data)))
+      print(paste("Mean: Rp.", round(mean(valid_data), 2)))
+      print(paste("Number of responses:", length(valid_data)))
+    }
+  }
+}
+
+# Health Facility Costs
+get_cost_stats(data$delivery_hf_cost_service, "Health Facility - Service Cost")
+get_cost_stats(data$delivery_hf_cost_meds, "Health Facility - Medicine Cost")
+get_cost_stats(data$delivery_hf_cost_transportation, "Health Facility - Transportation Cost")
+get_cost_stats(data$delivery_hf_cost_lab, "Health Facility - Laboratory Cost")
+get_cost_stats(data$delivery_hf_others_by_numbers, "Health Facility - Other Costs")
+
+# Home Delivery Costs
+get_cost_stats(data$delivery_home_cost_service, "Home Delivery - Service Cost")
+get_cost_stats(data$delivery_home_cost_meds, "Home Delivery - Medicine Cost")
+get_cost_stats(data$delivery_home_cost_transportation, "Home Delivery - Transportation Cost")
+get_cost_stats(data$delivery_home_cost_lab, "Home Delivery - Laboratory Cost")
+get_cost_stats(data$delivery_home_others_by_numbers, "Home Delivery - Other Costs")
+```
+```{r}
+
+# Then check structure of these variables
+str(data$delivery_hf_cost_lab)
+str(data$delivery_hf_others_by_numbers)
+str(data$delivery_home_cost_meds)
+str(data$delivery_home_cost_transportation)
+str(data$delivery_home_cost_lab)
+str(data$delivery_home_others_by_numbers)
+```
+```{r}
+# For Health Facility Laboratory Cost
+if(length(na.omit(data$delivery_hf_cost_lab)) > 0) {
+    lab_hf <- data$delivery_hf_cost_lab[data$delivery_hf_cost_lab > 0]
+    print("\nDelivery at Health Facility - Laboratory Cost:")
+    print(paste("Min: Rp.", format(min(lab_hf, na.rm=TRUE), big.mark=",")))
+    print(paste("Max: Rp.", format(max(lab_hf, na.rm=TRUE), big.mark=",")))
+    print(paste("Mean: Rp.", format(round(mean(lab_hf, na.rm=TRUE)), big.mark=",")))
+    print(paste("N =", length(na.omit(lab_hf))))
+} else {
+    print("\nDelivery at Health Facility - Laboratory Cost: No data available")
+}
+
+# For Health Facility Other Costs - corrected variable name
+if(length(na.omit(data$delivery_hf_cost_others_by_number)) > 0) {
+    others_hf <- data$delivery_hf_cost_others_by_number[data$delivery_hf_cost_others_by_number > 0]
+    print("\nDelivery at Health Facility - Other Costs:")
+    print(paste("Min: Rp.", format(min(others_hf, na.rm=TRUE), big.mark=",")))
+    print(paste("Max: Rp.", format(max(others_hf, na.rm=TRUE), big.mark=",")))
+    print(paste("Mean: Rp.", format(round(mean(others_hf, na.rm=TRUE)), big.mark=",")))
+    print(paste("N =", length(na.omit(others_hf))))
+} else {
+    print("\nDelivery at Health Facility - Other Costs: No data available")
+}
+
+# For Home Delivery Medicine Cost - corrected variable name (note double underscore)
+if(length(na.omit(data$delivery_home__cost_meds)) > 0) {
+    meds_home <- data$delivery_home__cost_meds[data$delivery_home__cost_meds > 0]
+    print("\nDelivery at Home - Medicine Cost:")
+    print(paste("Min: Rp.", format(min(meds_home, na.rm=TRUE), big.mark=",")))
+    print(paste("Max: Rp.", format(max(meds_home, na.rm=TRUE), big.mark=",")))
+    print(paste("Mean: Rp.", format(round(mean(meds_home, na.rm=TRUE)), big.mark=",")))
+    print(paste("N =", length(na.omit(meds_home))))
+} else {
+    print("\nDelivery at Home - Medicine Cost: No data available")
+}
+
+# For Home Delivery Other Costs - corrected variable name
+if(length(na.omit(data$delivery_home_cost_others_by_numbers)) > 0) {
+    others_home <- data$delivery_home_cost_others_by_numbers[data$delivery_home_cost_others_by_numbers > 0]
+    print("\nDelivery at Home - Other Costs:")
+    print(paste("Min: Rp.", format(min(others_home, na.rm=TRUE), big.mark=",")))
+    print(paste("Max: Rp.", format(max(others_home, na.rm=TRUE), big.mark=",")))
+    print(paste("Mean: Rp.", format(round(mean(others_home, na.rm=TRUE)), big.mark=",")))
+    print(paste("N =", length(na.omit(others_home))))
+} else {
+    print("\nDelivery at Home - Other Costs: No data available")
+}
+```
+```{r}
+freq_who_paid_delivery_cost <- table(data$who_paid_delivery_cost)
+percent_who_paid_delivery_cost <- round(prop.table(freq_who_paid_delivery_cost)*100, 2)
+result_who_paid_delivery_cost <- data.frame(
+   Response = names(freq_who_paid_delivery_cost),
+   Frequency = freq_who_paid_delivery_cost,
+   Percentage = percent_who_paid_delivery_cost,
+   Total = sum(freq_who_paid_delivery_cost)
+)
+print(result_who_paid_delivery_cost)
+```
+```{r}
+freq_delivery_same_place <- table(data$delivery_place_same_with_anc)
+percent_delivery_same_place <- round(prop.table(freq_delivery_same_place)*100, 2)
+result_delivery_same_place <- data.frame(
+   Response = c("No", "Yes"),
+   Frequency = freq_delivery_same_place,
+   Percentage = percent_delivery_same_place,
+   Total = sum(freq_delivery_same_place)
+)
+print(result_delivery_same_place)
+```
+```{r}
+table(data$last_child_age_weeks)
+table(data$postnatal_consultation)
+table(data$weeks_to_first_postnatal)
+table(data_pnc$baby_pnc_check)
+```
+```{r}
+# First exclude babies 2 weeks old
+data_pnc <- subset(data, last_child_age_weeks > 2)
+
+# Then calculate frequency and percentage
+freq_pnc <- table(data_pnc$postnatal_consultation)
+percent_pnc <- round(prop.table(freq_pnc)*100, 2)
+result_pnc <- data.frame(
+   Response = names(freq_pnc),
+   Frequency = freq_pnc,
+   Percentage = percent_pnc,
+   Total = sum(freq_pnc)
+)
+print(result_pnc)
+```
+```{r}
+freq_pnc_place <- table(data_pnc$postnatal_consultation_place)
+percent_pnc_place <- round(prop.table(freq_pnc_place)*100, 2)
+result_pnc_place <- data.frame(
+   Response = names(freq_pnc_place),
+   Frequency = freq_pnc_place,
+   Percentage = percent_pnc_place,
+   Total = sum(freq_pnc_place)
+)
+print(result_pnc_place)
+```
+```{r}
+freq_pnc_count <- table(data_pnc$pnc_visit_count)
+percent_pnc_count <- round(prop.table(freq_pnc_count)*100, 2)
+result_pnc_count <- data.frame(
+   Response = names(freq_pnc_count),
+   Frequency = freq_pnc_count,
+   Percentage = percent_pnc_count,
+   Total = sum(freq_pnc_count)
+)
+print(result_pnc_count)
+```
+```{r}
+# For each PNC service variable
+pnc_activity_vars <- c("pnc_vaccinated", "pnc_weight", "pnc_deworm", "pnc_vitamin_a")
+pnc_activity_labels <- c("Vaccination", "Weight measurement", "Deworming", "Vitamin A")
+
+# Calculate frequencies and percentages for each service
+for(i in 1:length(pnc_activity_vars)) {
+   freq <- table(data_pnc[[pnc_activity_vars[i]]])
+   percent <- round(prop.table(freq)*100, 2)
+   result <- data.frame(
+       Response = c("No", "Yes"),
+       Frequency = freq,
+       Percentage = percent,
+       Total = sum(freq)
+   )
+   print(paste("\n", pnc_activity_labels[i], ":"))
+   print(result)
+}
+```
+```{r}
+freq_baby_pnc <- table(data_pnc$baby_pnc_check)
+percent_baby_pnc <- round(prop.table(freq_baby_pnc)*100, 2)
+result_baby_pnc <- data.frame(
+   Response = c("No", "Yes"),
+   Frequency = freq_baby_pnc,
+   Percentage = percent_baby_pnc,
+   Total = sum(freq_baby_pnc)
+)
+print(result_baby_pnc)
+```
+```{r}
+# Get number of unvaccinated babies
+no_vac <- subset(data_pnc, pnc_vaccinated == 0)
+total_no_vac <- nrow(no_vac)
+
+# List all reason variables
+reason_novac_vars <- c("reasonnovac_vaccine_out_of_stock",
+                    "reasonnovac_vaccination_complete",
+                    "reasonnovac_no_staff_present", 
+                    "reasonnovac_father_refused_vaccine")
+
+# Create labels for more readable output
+reason_novac_labels <- c("Vaccine out of stock",
+                      "Vaccination complete",
+                      "No staff present",
+                      "Father refused vaccine")
+
+# Calculate frequency and percentage for each reason
+results_novac <- data.frame(
+   Reason = reason_novac_labels,
+   Frequency = numeric(length(reason_novac_vars)),
+   Percentage = numeric(length(reason_novac_vars))
+)
+
+for(i in 1:length(reason_novac_vars)) {
+   freq <- sum(no_vac[[reason_novac_vars[i]]], na.rm = TRUE)
+   results_novac$Frequency[i] <- freq
+   results_novac$Percentage[i] <- round((freq/total_no_vac)*100, 2)
+}
+
+print(results_novac)
+```
+```{r}
+# For each reason, just show the count of "Yes" responses
+no_pnc <- subset(data_pnc, postnatal_consultation == "no")
+total_no_pnc <- nrow(no_pnc)
+
+for(reason in c("reasonnopnc_no_money",
+                "reasonnopnc_forgot_appointment",
+                "reasonnopnc_care_for_child_at_home",
+                "reasonnopnc_health_facility_untrustworthy",
+                "reasonnopnc_poor_provider_care",
+                "reasonnopnc_avoided_child_vaccination",
+                "reasonnopnc_unfriendly_untrustworthy_staff",
+                "reasonnopnc_health_facility_unclean",
+                "reasonnopnc_long_distance_to_facility",
+                "reasonnopnc_husband_partner_disapproved")) {
+    yes_count <- sum(no_pnc[[reason]] == 1, na.rm = TRUE)
+    print(paste(reason, ": ", yes_count, " respondents"))
+}
+```
+```{r}
+table(data_pnc$reasonnopnc_no_money)
+table(data_pnc$reasonnopnc_forgot_appointment)
+table(data_pnc$reasonnopnc_care_for_child_at_home)
+table(data_pnc$reasonnopnc_health_facility_untrustworthy)
+table(data_pnc$reasonnopnc_poor_provider_care)
+table(data_pnc$reasonnopnc_avoided_child_vaccination)
+table(data_pnc$reasonnopnc_unfriendly_untrustworthy_staff)
+table(data_pnc$reasonnopnc_health_facility_unclean)
+table(data_pnc$reasonnopnc_long_distance_to_facility)
+table(data_pnc$reasonnopnc_husband_partner_disapproved)
+```
+```{r}
+freq_use_contraception <- table(data$use_contraception)
+percent_use_contraception <- round(prop.table(freq_use_contraception)*100, 2)
+result_use_contraception <- data.frame(
+   Response = c("No", "Yes"),
+   Frequency = freq_use_contraception,
+   Percentage = percent_use_contraception,
+   Total = sum(freq_use_contraception)
+)
+print(result_use_contraception)
+```
+```{r}
+freq_fp_method <- table(data$contraception_method_used)
+percent_fp_method <- round(prop.table(freq_fp_method)*100, 2)
+result_fp_method <- data.frame(
+   Response = names(freq_fp_method),
+   Frequency = freq_fp_method,
+   Percentage = percent_fp_method,
+   Total = sum(freq_fp_method)
+)
+print(result_fp_method)
+```
+```{r}
+freq_fp_facility <- table(data$family_planning_facility)
+percent_fp_facility <- round(prop.table(freq_fp_facility)*100, 2)
+result_fp_facility <- data.frame(
+   Response = names(freq_fp_facility),
+   Frequency = freq_fp_facility,
+   Percentage = percent_fp_facility,
+   Total = sum(freq_fp_facility)
+)
+print(result_fp_facility)
+```
+```{r}
+freq_regular_fp_facility <- table(data$regular_family_planning_facility)
+percent_regular_fp_facility <- round(prop.table(freq_regular_fp_facility)*100, 2)
+result_regular_fp_facility <- data.frame(
+   Response = names(freq_regular_fp_facility),
+   Frequency = freq_regular_fp_facility,
+   Percentage = percent_regular_fp_facility,
+   Total = sum(freq_regular_fp_facility)
+)
+print(result_regular_fp_facility)
+```
+```{r}
+freq_reason_change_fp_facility <- table(data$reason_for_changing_fp_facility)
+percent_reason_change_fp_facility <- round(prop.table(freq_reason_change_fp_facility)*100, 2)
+result_reason_change_fp_facility <- data.frame(
+   Response = names(freq_reason_change_fp_facility),
+   Frequency = freq_reason_change_fp_facility,
+   Percentage = percent_reason_change_fp_facility,
+   Total = sum(freq_reason_change_fp_facility)
+)
+print(result_reason_change_fp_facility)
+```
+```{r}
+# First, check how many people don't use contraception
+print("Number of people not using contraception:")
+print(table(data$use_contraception))
+
+# Then modify the code to handle the data properly
+# Get total number of people who don't use contraception
+no_fp <- subset(data, use_contraception == 0)
+total_no_fp <- nrow(no_fp)
+
+# List reasons and calculate
+reasonnofp_vars <- c("reasonnofp_wants_children_soon",
+                "reasonnofp_fear_of_side_effects",
+                "reasonnofp_lack_of_knowledge_about_methods",
+                "reasonnofp_no_access_to_services",
+                "reasonnofp_partner_disapproval",
+                "reasonnofp_religion_does_not_allow",
+                "reasonnofp_breastfeeding_feels_unnecessary",
+                "reasonnofp_already_menopausal",
+                "reasonnofp_health_reasons",
+                "reasonnofp_uncomfortable_with_methods",
+                "reasonnofp_cost_too_high",
+                "reasonnofp_personal_preference",
+                "reasonnofp_currently_pregnant",
+                "reasonnofp_traditional_methods",
+                "reasonnofp_not_married_or_divorced",
+                "reasonnofp_other_reasons")
+
+reasonnofp_labels <- c("Wants children soon",
+                  "Fear of side effects",
+                  "Lack of knowledge about methods",
+                  "No access to services",
+                  "Partner disapproval",
+                  "Religion does not allow",
+                  "Breastfeeding feels unnecessary",
+                  "Already menopausal",
+                  "Health reasons",
+                  "Uncomfortable with methods",
+                  "Cost too high",
+                  "Personal preference",
+                  "Currently pregnant",
+                  "Traditional methods",
+                  "Not married or divorced",
+                  "Other reasons")
+
+results_reasonnofp <- data.frame(
+    Reason = reasonnofp_labels,
+    Frequency = numeric(length(reasonnofp_vars)),
+    Percentage = numeric(length(reasonnofp_vars))
+)
+
+for(i in 1:length(reasonnofp_vars)) {
+    freq <- sum(no_fp[[reasonnofp_vars[i]]] == 1, na.rm = TRUE)
+    results_reasonnofp$Frequency[i] <- freq
+    if(total_no_fp > 0) {
+        results_reasonnofp$Percentage[i] <- round((freq/total_no_fp)*100, 2)
+    } else {
+        results_reasonnofp$Percentage[i] <- 0
+    }
+}
+
+print(results_reasonnofp)
+```
+```{r}
+# List all husband participation variables
+husband_vars <- c("husband_attended_anc",
+                "husband_provided_transport",
+                "husband_present_at_delivery",
+                "husband_discussed_with_provider",
+                "husband_cared_for_child_at_home",
+                "husband_bathed_newborn",
+                "husband_bought_baby_items",
+                "husband_present_for_immunization",
+                "husband_helped_with_breastfeeding")
+
+# Create labels for more readable output
+husband_labels <- c("Attended ANC",
+                  "Provided transport",
+                  "Present at delivery",
+                  "Discussed with provider",
+                  "Cared for child at home",
+                  "Bathed newborn",
+                  "Bought baby items",
+                  "Present for immunization",
+                  "Helped with breastfeeding")
+
+# Calculate frequency and percentage for each activity
+results_husband <- data.frame(
+   Activity = husband_labels,
+   Frequency = numeric(length(husband_vars)),
+   Percentage = numeric(length(husband_vars))
+)
+
+for(i in 1:length(husband_vars)) {
+   freq <- sum(data[[husband_vars[i]]] == 1, na.rm = TRUE)
+   results_husband$Frequency[i] <- freq
+   results_husband$Percentage[i] <- round((freq/nrow(data))*100, 2)
+}
+
+print(results_husband)
+```
+```{r}
+# For each husband participation variable
+for(i in 1:length(husband_vars)) {
+   freq_husband <- table(data[[husband_vars[i]]])
+   percent_husband <- round(prop.table(freq_husband)*100, 2)
+   result_husband <- data.frame(
+       Response = c("No", "Yes"),
+       Frequency = freq_husband,
+       Percentage = percent_husband,
+       Total = sum(freq_husband)
+   )
+   print(paste("\n", husband_labels[i], ":"))
+   print(result_husband)
+}
+```
+```{r}
+# First check exact categories present in your data
+table(data$start_breastfeeding)
+
+# Then filter out "Tidak tahu"
+data_bf <- subset(data, start_breastfeeding != "Tidak tahu")
+
+# Calculate frequencies and percentages
+freq_start_bf <- table(data_bf$start_breastfeeding)
+percent_start_bf <- round(prop.table(freq_start_bf)*100, 2)
+result_start_bf <- data.frame(
+    Response = names(freq_start_bf),
+    Frequency = freq_start_bf,
+    Percentage = percent_start_bf,
+    Total = sum(freq_start_bf)
+)
+print(result_start_bf)
+```
+```{r}
+table(data$mom_doing_bf)
+```
+```{r}
+freq_mom_doing_bf <- table(data$mom_doing_bf)
+percent_mom_doing_bf <- round(prop.table(freq_mom_doing_bf)*100, 2)
+result_mom_doing_bf <- data.frame(
+   Response = c("No", "Yes"),
+   Frequency = freq_mom_doing_bf,
+   Percentage = percent_mom_doing_bf,
+   Total = sum(freq_mom_doing_bf)
+)
+print(result_mom_doing_bf)
+```
+```{r}
+
+table(data$ifyes_total_bf_in_one_day)
+
+
+freq_bf_day <- table(data$ifyes_total_bf_in_one_day)
+percent_bf_day <- round(prop.table(freq_bf_day)*100, 2)
+result_bf_day <- data.frame(
+   Response = names(freq_bf_day),
+   Frequency = freq_bf_day,
+   Percentage = percent_bf_day,
+   Total = sum(freq_bf_day)
+)
+print(result_bf_day)
+```
+```{r}
+freq_not_bf <- table(data$ifnot_reasons_not_bf)
+percent_not_bf <- round(prop.table(freq_not_bf)*100, 2)
+result_not_bf <- data.frame(
+   Response = names(freq_not_bf),
+   Frequency = freq_not_bf,
+   Percentage = percent_not_bf,
+   Total = sum(freq_not_bf)
+)
+print(result_not_bf)
+```
+```{r}
+freq_non_bf_sixmonth <- table(data$give_non_bf_within_six_month)
+percent_non_bf_sixmonth <- round(prop.table(freq_non_bf_sixmonth)*100, 2)
+result_non_bf_sixmonth <- data.frame(
+   Response = c("No", "Yes"),
+   Frequency = freq_non_bf_sixmonth,
+   Percentage = percent_non_bf_sixmonth,
+   Total = sum(freq_non_bf_sixmonth)
+)
+print(result_non_bf_sixmonth)
+```
+```{r}
+# Get total number of people who gave non-breastfeeding food
+total_nonbf <- sum(data$give_non_bf_within_six_month == 1, na.rm = TRUE)
+
+# List all non-breastfeeding food variables
+nonbf_vars <- c("nonbf_six_month_sugar_solution",
+               "nonbf_six_month_rice_water",
+               "nonbf_six_month_mix_solution",
+               "nonbf_six_month_fruit_juice",
+               "nonbf_six_month_infant_formula",
+               "nonbf_six_month_tea",
+               "nonbf_six_month_coffee",
+               "nonbf_six_month_honey",
+               "nonbf_six_month_yogurt",
+               "nonbf_six_month_baby_cereal",
+               "nonbf_six_month_others")
+
+# Create labels for more readable output
+nonbf_labels <- c("Sugar solution",
+                "Rice water",
+                "Mix solution",
+                "Fruit juice",
+                "Infant formula",
+                "Tea",
+                "Coffee",
+                "Honey",
+                "Yogurt",
+                "Baby cereal",
+                "Others")
+
+# Calculate frequency and percentage for each food
+result_nonbf <- data.frame(
+   Food = nonbf_labels,
+   Frequency = numeric(length(nonbf_vars)),
+   Percentage = numeric(length(nonbf_vars))
+)
+
+for(i in 1:length(nonbf_vars)) {
+   freq <- sum(data[data$give_non_bf_within_six_month == 1, nonbf_vars[i]], na.rm = TRUE)
+   result_nonbf$Frequency[i] <- freq
+   result_nonbf$Percentage[i] <- round((freq/total_nonbf)*100, 2)
+}
+
+print(result_nonbf)
+```
+```{r}
+freq_owned_home <- table(data$owns_home)
+percent_owned_home <- round(prop.table(freq_owned_home)*100, 2)
+result_owned_home <- data.frame(
+   Response = names(freq_owned_home),
+   Frequency = freq_owned_home,
+   Percentage = percent_owned_home,
+   Total = sum(freq_owned_home)
+)
+print(result_owned_home)
+```
+```{r}
+print('hi')
+65
+```
+
+
+
