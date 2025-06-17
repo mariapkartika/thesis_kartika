@@ -1,0 +1,178 @@
+---
+title: "Multivariate"
+author: "Maria Kartika"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+## ANC Multivariate Outcome
+```{r Check NAs in every variables}
+print("Jumlah NA dalam setiap variabel:")
+sapply(data[, c("anc_visit_binary", "parted_category", "use_contraception", 
+               "age_first_category", "age_category", "transport_category",
+               "marital_category", "ethnic_category", "parity_category",
+               "anc_place_category", "pci_new", "male_category")], 
+       function(x) sum(is.na(x)))
+```
+```{r Install mice}
+library(mice)
+
+# Set up the imputation model
+# You can specify methods for each variable if needed
+imputation_methods <- make.method(data)
+print(imputation_methods)
+```
+```{r Imputed NAs MICE}
+# Run the MICE algorithm
+# m = number of imputed datasets
+# maxit = number of iterations
+set.seed(123) # For reproducibility
+anc_imputed_data <- mice(data[, c("anc_visit_binary", "parted_category", "use_contraception",
+                             "age_first_category", "age_category", "transport_category",
+                             "marital_category", "ethnic_category", "parity_category",
+                             "anc_place_category", "pci_new", "male_category")],
+                     m = 5,
+                     maxit = 50,
+                     method = "pmm", # Predictive mean matching, works well for both numeric and categorical
+                     printFlag = TRUE)
+```
+```{r Create a separate dataset after imputation}
+# View the first few imputed values for parted_category
+anc_imputed_data$imp$parted_category
+
+# Complete data analysis - Option 1: Use a single completed dataset
+anc_completed_data <- complete(anc_imputed_data, 1) # Choose imputation #1
+```
+```{r ANC Multivariate}
+anc_multivariate_model <- with(anc_imputed_data, 
+                 glm(anc_visit_binary ~ parted_category + use_contraception +
+                     age_first_category + age_category + transport_category +
+                     marital_category + ethnic_category + parity_category +
+                     anc_place_category + pci_new + male_category,
+                     family = binomial))
+
+# Pool the results
+anc_multipool_result <- pool(anc_multivariate_model)
+summary(anc_multipool_result)
+```
+```{r Table Result ANC Multivariate}
+# Ambil summary dari hasil pooling
+anc_pooled_summary <- summary(anc_multipool_result)
+
+# Hitung Odds Ratio dan Confidence Interval
+anc_pooled_summary$OR <- exp(anc_pooled_summary$estimate)
+anc_pooled_summary$CI_lower <- exp(anc_pooled_summary$estimate - 1.96 * anc_pooled_summary$std.error)
+anc_pooled_summary$CI_upper <- exp(anc_pooled_summary$estimate + 1.96 * anc_pooled_summary$std.error)
+
+# Tampilkan hasil lengkap dengan OR dan CI
+anc_pooled_result_with_or <- anc_pooled_summary[, c("term", "estimate", "std.error", "p.value", "OR", "CI_lower", "CI_upper")]
+print(anc_pooled_result_with_or)
+
+# Alternatif: Buat tabel yang lebih rapi untuk publikasi
+anc_or_table <- data.frame(
+  Variable = anc_pooled_summary$term,
+  OR = round(exp(anc_pooled_summary$estimate), 2),
+  CI_95 = paste0(round(exp(anc_pooled_summary$estimate - 1.96 * anc_pooled_summary$std.error), 2), 
+                "-", 
+                round(exp(anc_pooled_summary$estimate + 1.96 * anc_pooled_summary$std.error), 2)),
+  p_value = round(anc_pooled_summary$p.value, 3)
+)
+
+# Tampilkan tabel
+print(anc_or_table)
+```
+```{r Calculate VIF across all imputed datasets}
+# Calculate VIF across all imputed datasets and average them
+# For ANC model
+anc_vif_all <- lapply(1:5, function(i) {
+  anc_vif_completed <- complete(anc_imputed_data, i)
+  anc_vif_model <- glm(anc_visit_binary ~ parted_category + use_contraception +
+              age_first_category + age_category + transport_category +
+              marital_category + ethnic_category + parity_category +
+              anc_place_category + pci_new + male_category,
+              data = anc_completed_data,
+              family = binomial)
+  return(vif(anc_vif_model))
+})
+
+# Average VIF values across imputations for ANC
+anc_vif_mean <- Reduce("+", anc_vif_all) / length(anc_vif_all)
+print("Average VIF values across imputations for ANC model:")
+print(anc_vif_mean)
+
+```
+
+# Delivery Multivariate Outcome
+```{r Check NAs in every variables}
+sapply(data[, c("location_childbirth_category", "age_first_category", "education_category", 
+                "transport_category",
+```
+```{r Check NAs in every variables}
+"marital_category", "ethnic_category", "parity_category",
+               "delivery_payment_category", "pci_new", "male_category", "partocc_category", "parted_category")], 
+       function(x) sum(is.na(x)))
+```
+```{r Choose variable t impute}
+# Select the variables for imputation
+delivery_vars_impute <- c("location_childbirth_category", "age_first_category", "education_category",
+                   "transport_category", "marital_category", "ethnic_category", "parity_category",
+                   "delivery_payment_category", "pci_new", "male_category", 
+                   "partocc_category", "parted_category")
+
+# Check the missing data pattern
+md.pattern(data[, delivery_vars_impute], plot = FALSE)
+```
+```{r Impute with MICE}
+# Set up imputation - using predictive mean matching for all variables
+set.seed(123) # For reproducibility
+delivery_imputed_data <- mice(data[, delivery_vars_impute], 
+                     m = 5,          # Create 5 imputed datasets
+                     maxit = 50,     # 50 iterations
+                     method = "pmm", # Predictive mean matching
+                     printFlag = TRUE)
+```
+```{r Delivery Multivariate Analysis}
+# Now you can run your analysis on the imputed data
+# For example, if delivery outcome is your dependent variable:
+delivery_outcome_model <- with(delivery_imputed_data,
+                              glm(location_childbirth_category ~ age_first_category + 
+                                 education_category + transport_category + marital_category + 
+                                 ethnic_category + parity_category + delivery_payment_category + 
+                                 pci_new + male_category + partocc_category + parted_category,
+                                 family = binomial))
+```
+```{r Table Delivery Multivariate Result}
+# Pool the results from all imputed datasets
+delivery_pooled_result <- pool(delivery_outcome_model)
+delivery_summary_result <- summary(delivery_pooled_result)
+
+# Calculate and display odds ratios and confidence intervals
+delivery_or_table <- data.frame(
+  Variable = delivery_summary_result$term,
+  Odds_Ratio = round(exp(delivery_summary_result$estimate), 2),
+  CI_95_Lower = round(exp(delivery_summary_result$estimate - 1.96 * delivery_summary_result$std.error), 2),
+  CI_95_Upper = round(exp(delivery_summary_result$estimate + 1.96 * delivery_summary_result$std.error), 2),
+  P_value = round(delivery_summary_result$p.value, 3)
+)
+
+# Display the final table with odds ratios
+print(delivery_or_table)
+```
+```{r VIF score}
+# For Delivery model
+delivery_vif_all <- lapply(1:5, function(i) {
+  delivery_vif_completed <- complete(delivery_imputed_data, i)
+  delivery_vif_model <- glm(location_childbirth_category ~ age_first_category + 
+              education_category + transport_category + marital_category + 
+              ethnic_category + parity_category + delivery_payment_category + 
+              pci_new + male_category + partocc_category + parted_category,
+              data = del_completed_data,
+              family = binomial)
+  return(vif(delivery_vif_model))
+})
+
+# Average VIF values across imputations for Delivery
+delivery_vif_mean <- Reduce("+", delivery_vif_all) / length(delivery_vif_all)
+print("Average VIF values across imputations for Delivery model:")
+print(delivery_vif_mean)
+```
+
