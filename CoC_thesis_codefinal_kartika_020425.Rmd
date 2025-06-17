@@ -1,0 +1,3807 @@
+---
+title: "logistic_regression"
+author: "Maria Kartika"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r HAPUS, JANGAN KLIK KALAU GA MAU NGULANG}
+#clear the workspace
+rm(list=ls()) # removes all objects from the environment
+cat('\014') # clears the console
+```
+```{r Set library}
+# Install related library for analysis
+library("janitor")
+library("dplyr")
+library("tidyverse")
+library("ggplot2")
+library("scales")
+library("gtsummary")
+library("stargazer")
+library("ggalluvial")
+library("broom")
+```
+```{r Set working directory}
+# Set working directory
+setwd("~/Library/CloudStorage/OneDrive-HarvardUniversity/thesis_kartika")
+```
+```{r read data}
+# Loading data set
+library(readxl)
+data <- read_excel("~/Library/CloudStorage/OneDrive-HarvardUniversity/Research Tika/Kuisioner and Result/questionnaire_result_cleaned_binary.xlsx")
+```
+
+#################################################################################
+## Recategorize Independent Variable
+```{r mom education}
+#Recatogrize education level
+data <- data %>%
+  mutate(
+    education_category = case_when(
+      education_level %in% c("illiterate", "elementary school", "junior high school") ~ "Basic Education",
+      education_level %in% c("senior high school", "higher education") ~ "Advanced Education",
+      TRUE ~ NA_character_
+    )
+  )
+# To check the results
+# First show individual counts
+data %>%
+ count(education_category) %>%
+  arrange(education_category)
+```
+```{r mom occupation}
+library("dplyr")
+#Recatogrize occupation level
+table(data$occupation_level)  # or whatever your original occupation variable is named
+
+# Then properly recode it
+data <- data %>%
+  mutate(
+    occupation_category = case_when(
+      occupation_level %in% c("Housewife", "Unemployed", "Student", "College student") ~ "Unemployed",
+      occupation_level %in% c("Farmer", "Daily labour", "Sales", "Civil servant", 
+                            "Entrepeneur", "Honorary", "Fisherman", "Swasta") ~ "Employed",
+      TRUE ~ NA_character_
+    )
+  )
+
+# To check the results
+# To see the total sum for each category
+data %>%
+  count(occupation_category) %>%
+  arrange(occupation_category)
+```
+```{r Marital status}
+#Recatogrize marital status
+data <- data %>%
+  mutate(
+    marital_category = case_when(
+      marital_status %in% c("Married", "Cohabitants") ~ "Married/Cohabitants",
+      marital_status %in% c("Single", "Widow", "Divorced") ~ "Single/Widow/Divorced",
+      TRUE ~ NA_character_
+    )
+  )
+# To check the results
+# To see the total sum for each category
+data %>%
+  count(marital_category) %>%
+  arrange(marital_category)
+```
+```{r Ethnic group}
+library(dplyr)
+#Recatogrize Ethnic Groups
+data <- data %>%
+  mutate(
+    ethnic_category = case_when(
+      ethnic_group %in% c("Abun", "Mpur", "Moi", "Miyah") ~ "Indigenous",
+      ethnic_group %in% c("Biak", "Maybrat", "Serui", "Raja ampat", "Kaimana", "Genyem", "Inanuwatan", "Jayapura", "Karon", "Manokwari", "Wasyor") ~ "Indigenous",
+      ethnic_group %in% c("Others") ~ "Other Ethnicity", 
+      TRUE ~ NA_character_
+    )
+  )
+# To check the results
+# To see the total sum for each category
+data %>%
+  count(ethnic_category) %>%
+  arrange(ethnic_category)
+```
+```{r Parity}
+# Recatogrize Parity Groups
+data <- data %>%
+  mutate(
+    parity_category = case_when(
+      number_childbirths == 1 ~ "Primipara",
+      number_childbirths >= 2 ~ "Multipara",
+      TRUE ~ NA_character_
+    )
+  )
+```
+```{r Quantile Income}
+# First, clean and exclude invalid data
+data <- data %>%
+  mutate(
+    # Calculate income per capita, excluding 99 and NA values
+    income_per_capita = case_when(
+      monthly_household_income != 99 & 
+      !is.na(monthly_household_income) & 
+      dependents_supported_by_income != 99 & 
+      !is.na(dependents_supported_by_income) ~ monthly_household_income/dependents_supported_by_income,
+      TRUE ~ NA_real_
+    ),
+    
+    # Create quintiles only for valid values
+    income_quintile = cut(income_per_capita, 
+                         breaks = quantile(income_per_capita, 
+                                         probs = seq(0, 1, 0.2), 
+                                         na.rm = TRUE),
+                         labels = c("Lowest", "Lower", "Middle", "Higher", "Highest"),
+                         include.lowest = TRUE)
+  )
+
+# Check the distribution
+summary(data$income_per_capita, na.rm = TRUE)  # To see the range
+table(data$income_quintile, useNA = "ifany")   # To see distribution across quintiles
+```
+```{r Income binary}
+# Create new income category with 2 levels
+data <- data %>%
+  mutate(income_category = case_when(
+    income_quintile %in% c("Lowest", "Lower", "Middle") ~ "Lower Income",
+    income_quintile %in% c("Higher", "Highest") ~ "Higher Income"
+  ))
+# Check the distribution
+summary(data$income_per_capita, na.rm = TRUE)  # To see the range
+table(data$income_category, useNA = "ifany")   # To see distribution across quintiles
+```
+```{r ANC facility }
+# Create new variable ANC facility
+data <- data %>%
+  mutate(anc_place_category = case_when(
+    name_anc_facility %in% c("posyandu", "puskesmas") ~ "Primary Healthcare",
+    name_anc_facility %in% c("private hospital", "public hospital", "private doctor practice", "private midwife practice") ~ "Advanced Healthcare"
+  ))
+```
+```{r PNC facility}
+# Create new variable PNC facility
+data <- data %>%
+  mutate(pnc_place_category = case_when(
+    postnatal_consultation_place %in% c("posyandu", "puskesmas", "homevisit by hcw") ~ "Primary Healthcare",
+    postnatal_consultation_place %in% c("private hospital", "public hospital", "private doctor practice", "private midwife practice") ~ "Advanced Healthcare",
+    TRUE ~ NA_character_  # Add this as a catch-all for any other values
+  ))
+```
+```{r ANC Payment}
+# Create new variable who_paid_anc_cost
+data <- data %>%
+  mutate(anc_payment_category = case_when(
+    who_paid_anc_cost %in% c("Bpjs pemda") ~ "Government support",
+    who_paid_anc_cost %in% c("shared cost (husband and wife)", "husband", "self", "other family members", "non-family members") ~ "Out of pocket",
+    TRUE ~ NA_character_
+  ))
+```
+```{r Delivery cost}
+data <- data %>%
+  mutate(delivery_payment_category = case_when(
+    who_paid_delivery_cost %in% c("bpjs pemda", "no cost") ~ "Government/No cost",
+    who_paid_delivery_cost %in% c("shared cost (husband and wife)", "husband", "self", "other family members", "non-family members") ~ "Out of pocket",
+    TRUE ~ NA_character_
+  ))
+```
+```{r ANC Decision}
+data <- data %>%
+  mutate(anc_decision_category = case_when(
+    decision_maker_anc %in% c("self", "joint decision (husband and wife)") ~ "Autonomous decision",
+    decision_maker_anc %in% c("husband", "biological mother", "healthcare providers", "other family members", "mother in law") ~ "Others decision",
+    TRUE ~ NA_character_
+  ))
+```
+```{r Partner Occupation}
+data <- data %>%
+  mutate(partocc_category = case_when(
+    partner_occupation %in% c("Farmer", "Honorary", "Daily labour", "Unemployed", "Entrepeneur", "Fisherman", "Student") ~ "Informal sector",
+    partner_occupation %in% c("Sales", "Civil servant", "Private sector", "Public sector", "Police/army") ~ "Formal sector",
+    TRUE ~ NA_character_
+  ))
+```
+```{r Partner Education}
+data <- data %>%
+  mutate(
+    parted_category = case_when(
+      partner_education_level %in% c("illiterate", "elementary school", "junior high school") ~ "Basic education",
+      partner_education_level %in% c("senior high school", "higher education") ~ "Advanced education",
+      TRUE ~ NA_character_
+    )
+  )
+```
+```{r Travel distance to Puskesmas}
+data <- data %>%
+  mutate(phc_distance_category = case_when(
+    phc_travel_distance %in% c("by vehicle, <=30 mins", "by foot, <= 30 mins") ~ "<=30 minutes",
+    phc_travel_distance %in% c("by foot, >30 mins", "by vehicle, >30 mins", "by vehicle, > 30 mins", "by foot, > 30 mins") ~ ">30 minutes",
+    TRUE ~ NA_character_
+  ))
+```
+```{r Mode of Transportation}
+data <- data %>%
+  mutate(transport_category = case_when(
+    phc_mode_transportation %in% c("on foot") ~ "walking",
+    phc_mode_transportation %in% c("rent car", "public transportation", "own motorcycle", "own car", "borrowed motorcycle") ~ "vehicle",
+    TRUE ~ NA_character_
+  ))
+```
+```{r Age by the time of data collection}
+data <- data %>%
+  mutate(age_category = case_when(
+    age < 25 ~ "young reproductive age",
+    age >= 25 ~ "older reproductive age",
+    TRUE ~ NA_character_
+  ))
+```
+```{r Age at first childbirth}
+data <- data %>%
+  mutate(age_first_category = case_when(
+    age_first_childbirth < 20 ~ "young reproductive age",
+    age_first_childbirth >= 20 ~ "older reproductive age",
+    TRUE ~ NA_character_
+  ))
+```
+```{r ANC Cost Category}
+# Recategorize the Highest Cost of ANC
+data <- data %>%
+  mutate(anc_cost_category = case_when(
+    highest_cost_anc %in% c("nothing") ~ "no cost",
+    highest_cost_anc %in% c("others", "service", "meds/vitamins", "Lab") ~ "direct medical cost", 
+    highest_cost_anc %in% c("transportation") ~ "transportation cost",
+  ))
+```
+```{r ANC No Cost vs Transportation}
+# 1. No cost vs Transportation
+data <- data %>%
+  mutate(
+    # Filter to only include those two categories
+    cost_noVStrans = case_when(
+      anc_cost_category == "no cost" ~ "no cost",
+      anc_cost_category == "transportation cost" ~ "transportation cost",
+      TRUE ~ NA_character_
+    ),
+    # Convert to factor with "no cost" as reference
+    cost_noVStrans = factor(cost_noVStrans, 
+                           levels = c("no cost", "transportation cost"))
+  )
+```
+```{r ANC Cost vs Direct Medical Cost}
+# 2. No cost vs Direct medical cost
+data <- data %>%
+  mutate(
+    # Filter to only include those two categories
+    cost_noVSmedical = case_when(
+      anc_cost_category == "no cost" ~ "no cost",
+      anc_cost_category == "direct medical cost" ~ "direct medical cost",
+      TRUE ~ NA_character_
+    ),
+    # Convert to factor with "no cost" as reference
+    cost_noVSmedical = factor(cost_noVSmedical, 
+                             levels = c("no cost", "direct medical cost"))
+  )
+```
+```{r Delivery Cost Category}
+# Recategorize the Highest Cost of delivery
+data <- data %>%
+  mutate(delivery_cost_category = case_when(
+    highest_cost_delivery %in% c("nothing") ~ "no cost",
+    highest_cost_delivery %in% c("others", "service", "meds/vitamins", "Lab") ~ "direct medical cost", 
+    highest_cost_delivery %in% c("transportation") ~ "transportation cost",
+  ))
+```
+```{r Delivery No cost vs Transportation Cost}
+data <- data %>%
+  mutate(
+    # Filter to only include those two categories
+    del_noVStrans = case_when(
+      delivery_cost_category == "no cost" ~ "no cost",
+      delivery_cost_category == "transportation cost" ~ "transportation cost",
+      TRUE ~ NA_character_
+    ),
+    # Convert to factor with "no cost" as reference
+    del_noVStrans = factor(del_noVStrans, 
+                           levels = c("no cost", "transportation cost"))
+  )
+```
+```{r Delivery No cost vs Direct Medical Cost}
+# 2. No cost vs Direct medical cost
+data <- data %>%
+  mutate(
+    # Filter to only include those two categories
+    del_noVSmedical = case_when(
+      delivery_cost_category == "no cost" ~ "no cost",
+      delivery_cost_category == "direct medical cost" ~ "direct medical cost",
+      TRUE ~ NA_character_
+    ),
+    # Convert to factor with "no cost" as reference
+    del_noVSmedical = factor(del_noVSmedical, 
+                             levels = c("no cost", "direct medical cost"))
+  )
+```
+```{r Mean and SD age}
+mean_age <- mean(data$age, na.rm = TRUE)
+sd_age <- sd(data$age, na.rm = TRUE)
+print(mean_age)
+print(sd_age)
+```
+
+###############################################################################
+##############DESCRIPTIVE 
+```{r}
+table(data$parity_category)
+table(data$partner_education_level)
+table(data$partner_occupation)
+sd(data$income_per_capita, na.rm = TRUE)
+table(data$anc_payment_category)
+table(data$delivery_assistant)
+table(data$delivery_payment_category)
+table(data$transport_category)
+table(data$phc_travel_distance)
+table(data$male_category)
+```
+
+###################################################################################
+# Recategorize Outcome Variable
+```{r outcome - ANC visit}
+#Recatogrize Total ANC Visits ~ Outcome Variable
+# Recode both variables
+data <- data %>%
+  mutate(
+    # Recode pregnancy_anc
+    doing_anc = case_when(
+      pregnancy_anc == 1 ~ 1,
+      pregnancy_anc == 0 ~ 0,
+      TRUE ~ NA_real_
+    ),
+    
+    # Recode total_anc_visit into categories and combine with pregnancy_anc
+    anc_visit_category = case_when(
+      doing_anc == 0 ~ "No ANC",
+      doing_anc == 1 & total_anc_visit %in% c("one", "two", "three") ~ "Less than four",
+      doing_anc == 1 & total_anc_visit %in% c("four", "more than four") ~ "Four or more",
+      TRUE ~ NA_character_
+    )
+  )
+
+#Recatogrize Skilled Birth Delivery ~ Outcome Variable
+data <- data %>%
+  mutate(
+    early_anc = case_when(
+      month_pregnancy_first_anc_visit %in% c("first trimester") ~ "early anc",
+      month_pregnancy_first_anc_visit %in% c("second trimester", "third trimester", "don't know") ~ "late anc",
+      TRUE ~ NA_character_
+    )
+  )
+
+# To check the results
+data %>%
+  count(doing_anc)
+
+# To check the combined categorization
+data %>%
+  count(doing_anc, anc_visit_category) %>%
+  arrange(doing_anc, anc_visit_category)
+```
+```{r anc visit binary}
+# First, let's recode ANC visits into binary categories
+data <- data %>%
+  mutate(
+    anc_visit_binary = case_when(
+      anc_visit_category %in% c("No ANC", "Less than four") ~ "Inadequate",
+      anc_visit_category == "Four or more" ~ "Adequate",
+      TRUE ~ NA_character_
+    )
+  )
+```
+```{r Outcome - Delivery}
+#Recatogrize Skilled Birth Delivery ~ Outcome Variable
+data <- data %>%
+  mutate(
+    location_childbirth_category = case_when(
+      location_last_childbirth %in% c("at puskesmas", "at hospital") ~ "Institutional childbirth",
+      location_last_childbirth %in% c("at midwife's home", "at home with healthcare provider", "at home with someone else", "at home with traditional birth attendance", "at home alone") ~ "Non-institutional childbirth",
+      TRUE ~ NA_character_
+    )
+  )
+
+
+# To check the results
+# To see the total sum for each category
+data %>%
+  count(location_childbirth_category) %>%
+  arrange(location_childbirth_category)
+```
+```{r Outcome - PNC binary}
+# Recategorize PNC variables ~ Outcome variable
+data <- data %>%
+  mutate(
+    # First create PNC eligibility based on child age
+    pnc_eligible = case_when(
+      last_child_age_weeks <= 2 ~ "Not eligible",
+      last_child_age_weeks > 2 ~ "Eligible",
+      TRUE ~ NA_character_
+    ),
+    
+    # Then categorize PNC status for eligible cases
+    pnc_category = case_when(
+      pnc_eligible == "Not eligible" ~ "Not eligible",
+      pnc_eligible == "Eligible" & postnatal_consultation == "yes, mom and baby" ~ "Mother and Child",
+      pnc_eligible == "Eligible" & (postnatal_consultation == "yes, only baby" | 
+                                   postnatal_consultation == "yes, only mom") ~ "Either one",
+      pnc_eligible == "Eligible" & postnatal_consultation == "did not go" ~ "No PNC",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Recode PNC visits into binary categories
+data <- data %>%
+  mutate(
+    pnc_binary = case_when(
+      pnc_category %in% c("Either one", "No PNC") ~ "Inadequate",
+      pnc_category == "Mother and Child" ~ "Adequate",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Recode EARLY PNC visits into binary categories
+data <- data %>%
+  mutate(
+    early_pnc = case_when(
+      pnc_category %in% c("Either one", "Mother and Child") ~ "any pnc",
+      pnc_category == "No PNC" ~ "no pnc",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Check the results
+data %>%
+  count(pnc_eligible, postnatal_consultation, pnc_category) %>%
+  arrange(pnc_eligible, pnc_category)
+
+# To see final counts of eligible cases
+data %>%
+  filter(pnc_eligible == "Eligible") %>%
+  count(pnc_category) %>%
+  arrange(pnc_category)
+```
+
+###################################################################################
+# ANC AS AN OUTCOME VARIABLE
+```{r ANC and No cost vs Direct medical cost}
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$cost_noVSmedical <- factor(data$cost_noVSmedical, 
+                               levels = c("no cost", "direct medical cost"))
+
+# Perform logistic regression
+anc_costnoVSmedical_model <- glm(anc_visit_binary ~ cost_noVSmedical, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_costnoVSmedical_model)
+
+exp(cbind(OR = coef(anc_costnoVSmedical_model), confint(anc_costnoVSmedical_model)))
+
+# Check distribution
+table(data$cost_noVSmedical, data$anc_visit_binary)
+prop.table(table(data$cost_noVSmedical, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and NO cost VS Transport}
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$cost_noVStrans <- factor(data$cost_noVStrans, 
+                               levels = c("no cost", "transportation cost"))
+
+# Perform logistic regression
+anc_costnoVStrans_model <- glm(anc_visit_binary ~ cost_noVStrans, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_costnoVStrans_model)
+
+exp(cbind(OR = coef(anc_costnoVStrans_model), confint(anc_costnoVStrans_model)))
+
+# Check distribution
+table(data$cost_noVStrans, data$anc_visit_binary)
+prop.table(table(data$cost_noVStrans, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Partner Education}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$parted_category <- factor(data$parted_category, 
+                               levels = c("Basic education", "Advanced education"))
+
+# Perform logistic regression
+anc_parted_model <- glm(anc_visit_binary ~ parted_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_parted_model)
+
+exp(cbind(OR = coef(anc_parted_model), confint(anc_parted_model)))
+
+# Check distribution
+table(data$parted_category, data$anc_visit_binary)
+prop.table(table(data$parted_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Partner Occupation}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$partocc_category <- factor(data$partocc_category, 
+                               levels = c("Informal sector", "Formal sector"))
+
+# Perform logistic regression
+anc_partocc_model <- glm(anc_visit_binary ~ partocc_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_partocc_model)
+
+exp(cbind(OR = coef(anc_partocc_model), confint(anc_partocc_model)))
+
+# Check distribution
+table(data$partocc_category, data$anc_visit_binary)
+prop.table(table(data$partocc_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and contraception}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$use_contraception <- factor(data$use_contraception, 
+                               levels = c("0", "1"))
+
+# Perform logistic regression
+anc_fp_model <- glm(anc_visit_binary ~ use_contraception, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_fp_model)
+
+exp(cbind(OR = coef(anc_fp_model), confint(anc_fp_model)))
+
+# Check distribution
+table(data$use_contraception, data$anc_visit_binary)
+prop.table(table(data$use_contraception, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Highest cost}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$anc_cost_category <- factor(data$anc_cost_category, 
+                               levels = c("no cost", "transportation cost", "direct medical cost"))
+
+# Perform logistic regression
+anc_cost_model <- glm(anc_visit_binary ~ anc_cost_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_cost_model)
+
+exp(cbind(OR = coef(anc_cost_model), confint(anc_cost_model)))
+
+# Check distribution
+table(data$anc_cost_category, data$anc_visit_binary)
+prop.table(table(data$anc_cost_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and PHC transport Cost}
+# Load required library
+library(dplyr)
+
+# Remove rows with missing or problematic values
+data_cleaned_phccost <- data %>%
+  filter(!is.na(phc_transport_cost_per_trip) & 
+         phc_transport_cost_per_trip != 99)
+
+# Perform logistic regression
+# Convert to factor and set the reference level
+data_cleaned_phccost$anc_visit_binary <- factor(data_cleaned_phccost$anc_visit_binary, 
+                                                levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+anc_phccost_model <- glm(anc_visit_binary ~ phc_transport_cost_per_trip,
+                         family = binomial(link = "logit"),
+                         data = data_cleaned_phccost)
+
+# View summary
+summary(anc_phccost_model)
+
+# Calculate odds ratios with confidence intervals
+exp(cbind(OR = coef(anc_phccost_model), confint(anc_phccost_model)))
+
+# Check distribution
+table(data_cleaned_phccost$phc_transport_cost_per_trip, 
+      data_cleaned_phccost$anc_visit_binary)
+
+# Proportion table
+prop.table(table(data_cleaned_phccost$phc_transport_cost_per_trip, 
+                 data_cleaned_phccost$anc_visit_binary), 1) * 100
+```
+```{r ANC and food insecurity}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$food_insecurity_three_months <- factor(data$food_insecurity_three_months, 
+                               levels = c("0", "1"))
+
+# Perform logistic regression
+anc_food_model <- glm(anc_visit_binary ~ food_insecurity_three_months, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_food_model)
+
+exp(cbind(OR = coef(anc_food_model), confint(anc_food_model)))
+
+# Check distribution
+table(data$food_insecurity_three_months, data$anc_visit_binary)
+prop.table(table(data$food_insecurity_three_months, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and age at first childbirth}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$age_first_category <- factor(data$age_first_category, 
+                               levels = c("young reproductive age", "older reproductive age"))
+
+# Perform logistic regression
+anc_agefirst_model <- glm(anc_visit_binary ~ age_first_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_agefirst_model)
+
+exp(cbind(OR = coef(anc_agefirst_model), confint(anc_agefirst_model)))
+
+# Check distribution
+table(data$age_first_category, data$anc_visit_binary)
+prop.table(table(data$age_first_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and age at the first childbirth contionous}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+# Perform logistic regression
+anc_agefirstcont_model <- glm(anc_visit_binary ~ age_first_childbirth, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_agefirstcont_model)
+
+exp(cbind(OR = coef(anc_agefirstcont_model), confint(anc_agefirstcont_model)))
+
+# Check distribution
+table(data$age_first_childbirth, data$anc_visit_binary)
+prop.table(table(data$age_first_childbirth, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Age }
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$age_category <- factor(data$age_category, 
+                               levels = c("young reproductive age", "older reproductive age"))
+
+# Perform logistic regression
+anc_age_model <- glm(anc_visit_binary ~ age_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_age_model)
+
+exp(cbind(OR = coef(anc_age_model), confint(anc_age_model)))
+
+# Check distribution
+table(data$age_category, data$anc_visit_binary)
+prop.table(table(data$age_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Age contionus}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+anc_agecont_model <- glm(anc_visit_binary ~ age, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_agecont_model)
+
+exp(cbind(OR = coef(anc_agecont_model), confint(anc_agecont_model)))
+
+# Check distribution
+table(data$age, data$anc_visit_binary)
+prop.table(table(data$age, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and mode of transportation}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$transport_category <- factor(data$transport_category, 
+                               levels = c("walking", "vehicle"))
+
+# Perform logistic regression
+anc_transport_model <- glm(anc_visit_binary ~ transport_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_transport_model)
+
+exp(cbind(OR = coef(anc_transport_model), confint(anc_transport_model)))
+
+# Check distribution
+table(data$transport_category, data$anc_visit_binary)
+prop.table(table(data$transport_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Education}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$education_category <- factor(data$education_category, 
+                                levels = c("Basic Education", "Advanced Education"))
+
+# Perform logistic regression
+anc_education_model <- glm(anc_visit_binary ~ education_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_education_model)
+
+exp(cbind(OR = coef(anc_education_model), confint(anc_education_model)))
+
+```
+```{r ANC and PHC travel distance}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$phc_distance_category <- factor(data$phc_distance_category, 
+                               levels = c("<=30 minutes", ">30 minutes"))
+
+# Perform logistic regression
+anc_phcdistance_model <- glm(anc_visit_binary ~ phc_distance_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_phcdistance_model)
+
+exp(cbind(OR = coef(anc_phcdistance_model), confint(anc_phcdistance_model)))
+
+# Check distribution
+table(data$phc_distance_category, data$anc_visit_binary)
+prop.table(table(data$phc_distance_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Occupation }
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$occupation_category <- factor(data$occupation_category, 
+                                levels = c("Unemployed", "Employed"))
+
+# Perform logistic regression
+anc_occupation_model <- glm(anc_visit_binary ~ occupation_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_occupation_model)
+
+exp(cbind(OR = coef(anc_occupation_model), confint(anc_occupation_model)))
+```
+```{r ANC and Occupation}
+# Get results using broom
+anc_occupation_result <- tidy(anc_occupation_model, conf.int = TRUE, exponentiate = TRUE)
+anc_occupation_result$OR <- round(anc_occupation_result$estimate, 2)
+anc_occupation_result$CI <- paste0("(", round(anc_occupation_result$conf.low, 2), " - ", round(anc_occupation_result$conf.high, 2), ")")
+anc_occupation_result$p.value <- round(anc_occupation_result$p.value, 3)
+
+# Print final results
+print(anc_occupation_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_anc_occupation <- table(data$occupation_category, data$anc_visit_binary)
+print("\nDistribution table:")
+print(table_anc_occupation)
+print("\nPercentages by occupation category:")
+print(round(prop.table(table_anc_occupation, 1) * 100, 2))  # Row percentages
+```
+```{r ANC and marital status}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$marital_category <- factor(data$marital_category, 
+                                levels = c("Single/Widow/Divorced", "Married/Cohabitants"))
+
+# Perform logistic regression
+anc_marital_model <- glm(anc_visit_binary ~ marital_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_marital_model)
+
+exp(cbind(OR = coef(anc_marital_model), confint(anc_marital_model)))
+```
+```{r ANC and Marital Status}
+# Get results using broom
+anc_marital_result <- tidy(anc_marital_model, conf.int = TRUE, exponentiate = TRUE)
+anc_marital_result$OR <- round(anc_marital_result$estimate, 2)
+anc_marital_result$CI <- paste0("(", round(anc_marital_result$conf.low, 2), " - ", round(anc_marital_result$conf.high, 2), ")")
+anc_marital_result$p.value <- round(anc_marital_result$p.value, 3)
+
+# Print final results
+print(anc_marital_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_anc_marital <- table(data$marital_category, data$anc_visit_binary)
+print("\nDistribution table:")
+print(table_anc_marital)
+print("\nPercentages by marital category:")
+print(round(prop.table(table_anc_marital, 1) * 100, 2))  # Row percentages
+```
+```{r ANC and Ethnic group}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$ethnic_category <- factor(data$ethnic_category, 
+                           levels = c("Indigenous", 
+                                    "Other Ethnicity"))
+# Perform logistic regression
+anc_ethnic_model <- glm(anc_visit_binary ~ ethnic_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_ethnic_model)
+
+exp(cbind(OR = coef(anc_ethnic_model), confint(anc_ethnic_model)))
+```
+```{r ANC and Ethnic}
+# Get results using broom
+anc_ethnic_result <- tidy(anc_ethnic_model, conf.int = TRUE, exponentiate = TRUE)
+anc_ethnic_result$OR <- round(anc_ethnic_result$estimate, 2)
+anc_ethnic_result$CI <- paste0("(", round(anc_ethnic_result$conf.low, 2), " - ", round(anc_ethnic_result$conf.high, 2), ")")
+anc_ethnic_result$p.value <- round(anc_ethnic_result$p.value, 3)
+
+# Print final results
+print(anc_ethnic_result[, c("term", "OR", "CI", "p.value")])
+
+# Get distribution table
+# Distribution table
+table_anc_ethnic <- table(data$ethnic_category, data$anc_visit_binary)
+print("\nDistribution table:")
+print(table_anc_ethnic)
+print("\nPercentages by marital category:")
+print(round(prop.table(table_anc_ethnic, 1) * 100, 2))  # Row percentages
+
+```
+```{r ANC and Parity}
+# Convert to factor and set reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$parity_category <- factor(data$parity_category, 
+                             levels = c("Primipara", "Multipara"))
+
+# Perform logistic regression
+anc_parity_model <- glm(anc_visit_binary ~ parity_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(anc_parity_model)
+exp(cbind(OR = coef(anc_parity_model), confint(anc_parity_model)))
+
+# Check distribution
+table(data$parity_category, data$anc_visit_binary)
+prop.table(table(data$parity_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Income Quintile}
+# Convert to factor
+data$income_category <- factor(data$income_category, 
+                              levels = c("Lower Income", "Higher Income"))
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+anc_income_model <- glm(anc_visit_binary ~ income_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(anc_income_model)
+exp(cbind(OR = coef(anc_income_model), confint(anc_income_model)))
+
+# Check distribution
+table(data$income_category, data$anc_visit_binary)
+prop.table(table(data$income_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Income per capita- continous}
+# Ensure anc_visit_binary is still a factor
+data$anc_visit_binary <- factor(data$anc_visit_binary,
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression with continuous income per capita
+anc_capita_model <- glm(anc_visit_binary ~ income_per_capita,
+                       family = binomial(link = "logit"),
+                       data = data,
+                       na.action = na.omit)
+
+# Get results
+summary(anc_capita_model)
+exp(cbind(OR = coef(anc_capita_model), confint(anc_capita_model)))
+```
+```{r ANC and ANC Facility}
+# Convert to factor
+data$anc_place_category <- factor(data$anc_place_category,
+                                 levels = c("Primary Healthcare", "Advanced Healthcare"))
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+anc_facility_model <- glm(anc_visit_binary ~ anc_place_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(anc_facility_model)
+exp(cbind(OR = coef(anc_facility_model), confint(anc_facility_model)))
+
+# Check distribution
+table(data$anc_place_category, data$anc_visit_binary)
+prop.table(table(data$anc_place_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and anc_cost_category}
+# Convert to factor
+data$anc_cost_category <- factor(data$anc_cost_category,
+                                 levels = c("Government support", "Out of pocket"))
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+anc_cost_model <- glm(anc_visit_binary ~ anc_payment_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(anc_cost_model)
+exp(cbind(OR = coef(anc_cost_model), confint(anc_cost_model)))
+
+# Check distribution
+table(data$anc_payment_category, data$anc_visit_binary)
+prop.table(table(data$anc_payment_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Decision}
+# Convert to factor
+data$anc_decision_category <- factor(data$anc_decision_category,
+                                 levels = c("Autonomous decision", "Others decision"))
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+anc_decision_model <- glm(anc_visit_binary ~ anc_decision_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(anc_decision_model)
+exp(cbind(OR = coef(anc_decision_model), confint(anc_cost_model)))
+
+# Check distribution
+table(data$anc_decision_category, data$anc_visit_binary)
+prop.table(table(data$anc_decision_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and Partner Occupation}
+# Convert to factor
+data$partocc_category <- factor(data$partocc_category,
+                                 levels = c("Informal sector", "Formal sector"))
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+anc_partocc_model <- glm(anc_visit_binary ~ partocc_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(anc_partocc_model)
+exp(cbind(OR = coef(anc_partocc_model), confint(anc_partocc_model)))
+
+# Check distribution
+table(data$partocc_category, data$anc_visit_binary)
+prop.table(table(data$partocc_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and delivery}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+
+# Perform logistic regression
+anc_delivery_model <- glm(anc_visit_binary ~ location_childbirth_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_delivery_model)
+
+exp(cbind(OR = coef(anc_delivery_model), confint(anc_delivery_model)))
+
+# Check distribution
+table(data$location_childbirth_category, data$anc_visit_binary)
+prop.table(table(data$location_childbirth_category, data$anc_visit_binary), 1) * 100
+```
+```{r ANC and PNC}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+anc_pnc_model <- glm(anc_visit_binary ~ pnc_binary, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(anc_pnc_model)
+
+exp(cbind(OR = coef(anc_pnc_model), confint(anc_pnc_model)))
+
+# Check distribution
+table(data$pnc_binary, data$anc_visit_binary)
+prop.table(table(data$pnc_binary, data$anc_visit_binary), 1) * 100
+```
+
+###################################################################################
+## Outcome Delivery
+```{r Delivery and No cost vs Medical cost}
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$del_noVSmedical <- factor(data$del_noVSmedical, 
+                               levels = c("no cost", "direct medical cost"))
+
+# Perform logistic regression
+delivery_delnoVSmed_model <- glm(location_childbirth_category ~ del_noVSmedical, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_delnoVSmed_model)
+
+exp(cbind(OR = coef(delivery_delnoVSmed_model), confint(delivery_delnoVSmed_model)))
+
+# Check distribution
+table(data$del_noVSmedical, data$location_childbirth_category)
+prop.table(table(data$del_noVSmedical, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and No Cost VS Transportation cost}
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$del_noVStrans <- factor(data$del_noVStrans, 
+                               levels = c("no cost", "transportation cost"))
+
+# Perform logistic regression
+delivery_delnoVStrans_model <- glm(location_childbirth_category ~ del_noVStrans, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_delnoVStrans_model)
+
+exp(cbind(OR = coef(delivery_delnoVStrans_model), confint(delivery_delnoVStrans_model)))
+
+# Check distribution
+table(data$del_noVStrans, data$location_childbirth_category)
+prop.table(table(data$del_noVStrans, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Partner Education}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$parted_category <- factor(data$parted_category, 
+                               levels = c("Basic education", "Advanced education"))
+
+# Perform logistic regression
+delivery_parted_model <- glm(location_childbirth_category ~ parted_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_parted_model)
+
+exp(cbind(OR = coef(delivery_parted_model), confint(delivery_parted_model)))
+
+# Check distribution
+table(data$parted_category, data$location_childbirth_category)
+prop.table(table(data$parted_category, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Partner Occupation}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$partocc_category <- factor(data$partocc_category, 
+                               levels = c("Informal sector", "Formal sector"))
+
+# Perform logistic regression
+delivery_partocc_model <- glm(location_childbirth_category ~ partocc_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_partocc_model)
+
+exp(cbind(OR = coef(delivery_partocc_model), confint(delivery_partocc_model)))
+
+# Check distribution
+table(data$partocc_category, data$location_childbirth_category)
+prop.table(table(data$partocc_category, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Contraception}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$use_contraception <- factor(data$use_contraception, 
+                               levels = c("0", "1"))
+
+# Perform logistic regression
+delivery_fp_model <- glm(location_childbirth_category ~ use_contraception, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_fp_model)
+
+exp(cbind(OR = coef(delivery_fp_model), confint(delivery_fp_model)))
+
+# Check distribution
+table(data$use_contraception, data$location_childbirth_category)
+prop.table(table(data$use_contraception, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Highest cost}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$delivery_cost_category <- factor(data$delivery_cost_category, 
+                               levels = c("no cost", "transportation cost", "direct medical cost"))
+
+# Perform logistic regression
+delivery_cost_model <- glm(location_childbirth_category ~ delivery_cost_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_cost_model)
+
+exp(cbind(OR = coef(delivery_cost_model), confint(delivery_cost_model)))
+
+# Check distribution
+table(data$delivery_cost_category, data$location_childbirth_category)
+prop.table(table(data$delivery_cost_category, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and PHC Cost Transport}
+# Perform logistic regression
+# Convert to factor and set the reference level
+data_cleaned_phccost$location_childbirth_category <- factor(data_cleaned_phccost$location_childbirth_category, 
+                                                levels = c("Non-institutional childbirth", "Institutional childbirth"))
+
+# Perform logistic regression
+delivery_phccost_model <- glm(location_childbirth_category ~ phc_transport_cost_per_trip,
+                         family = binomial(link = "logit"),
+                         data = data_cleaned_phccost)
+
+# View summary
+summary(delivery_phccost_model)
+
+# Calculate odds ratios with confidence intervals
+exp(cbind(OR = coef(delivery_phccost_model), confint(delivery_phccost_model)))
+
+# Check distribution
+table(data_cleaned_phccost$phc_transport_cost_per_trip, 
+      data_cleaned_phccost$location_childbirth_category)
+
+# Proportion table
+prop.table(table(data_cleaned_phccost$phc_transport_cost_per_trip, 
+                 data_cleaned_phccost$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Food Insecurity}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$food_insecurity_three_months <- factor(data$food_insecurity_three_months, 
+                               levels = c("0", "1"))
+# Perform logistic regression
+delivery_food_model <- glm(location_childbirth_category ~ food_insecurity_three_months, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_food_model)
+
+exp(cbind(OR = coef(delivery_food_model), confint(delivery_food_model)))
+
+# Check distribution
+table(data$food_insecurity_three_months, data$location_childbirth_category)
+prop.table(table(data$food_insecurity_three_months, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Age at frist childbirth}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$age_first_category <- factor(data$age_first_category, 
+                               levels = c("young reproductive age", "older reproductive age"))
+# Perform logistic regression
+delivery_agefirst_model <- glm(location_childbirth_category ~ age_first_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_agefirst_model)
+
+exp(cbind(OR = coef(delivery_agefirst_model), confint(delivery_agefirst_model)))
+
+# Check distribution
+table(data$age_first_category, data$location_childbirth_category)
+prop.table(table(data$age_first_category, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Age first contionous }
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+
+# Perform logistic regression
+delivery_agefirstcont_model <- glm(location_childbirth_category ~ age_first_childbirth, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_agefirstcont_model)
+
+exp(cbind(OR = coef(delivery_agefirstcont_model), confint(delivery_agefirstcont_model)))
+
+# Check distribution
+table(data$age_first_childbirth, data$location_childbirth_category)
+prop.table(table(data$age_first_childbirth, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Age}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$age_category <- factor(data$age_category, 
+                               levels = c("young reproductive age", "older reproductive age"))
+# Perform logistic regression
+delivery_age_model <- glm(location_childbirth_category ~ age_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_age_model)
+
+exp(cbind(OR = coef(delivery_age_model), confint(delivery_age_model)))
+
+# Check distribution
+table(data$age_category, data$location_childbirth_category)
+prop.table(table(data$age_category, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Age contionus}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+
+# Perform logistic regression
+delivery_agecont_model <- glm(location_childbirth_category ~ age, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_agecont_model)
+
+exp(cbind(OR = coef(delivery_agecont_model), confint(delivery_agecont_model)))
+
+# Check distribution
+table(data$age, data$location_childbirth_category)
+prop.table(table(data$age, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Mode of Transportation}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$transport_category <- factor(data$transport_category, 
+                               levels = c("walking", "vehicle"))
+
+# Perform logistic regression
+delivery_transport_model <- glm(location_childbirth_category ~ transport_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_transport_model)
+
+exp(cbind(OR = coef(delivery_transport_model), confint(delivery_transport_model)))
+
+# Check distribution
+table(data$transport_category, data$location_childbirth_category)
+prop.table(table(data$transport_category, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and PHC travel distance}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$phc_distance_category <- factor(data$phc_distance_category, 
+                               levels = c("<=30 minutes", ">30 minutes"))
+
+# Perform logistic regression
+delivery_phcdistance_model <- glm(location_childbirth_category ~ phc_distance_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_phcdistance_model)
+
+exp(cbind(OR = coef(delivery_phcdistance_model), confint(delivery_phcdistance_model)))
+
+# Check distribution
+table(data$phc_distance_category, data$location_childbirth_category)
+prop.table(table(data$phc_distance_category, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and PNC}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+delivery_pnc_model <- glm(location_childbirth_category ~ pnc_binary, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_pnc_model)
+
+exp(cbind(OR = coef(delivery_pnc_model), confint(delivery_pnc_model)))
+
+# Check distribution
+table(data$pnc_binary, data$location_childbirth_category)
+prop.table(table(data$pnc_binary, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and ANC}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+
+# Perform logistic regression
+delivery_anc_model <- glm(location_childbirth_category ~ anc_visit_binary, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_anc_model)
+
+exp(cbind(OR = coef(delivery_anc_model), confint(delivery_anc_model)))
+
+# Check distribution
+# Check distribution
+table(data$anc_visit_binary, data$location_childbirth_category)
+prop.table(table(data$anc_visit_binary, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Education}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$education_category <- factor(data$education_category, 
+                                levels = c("Basic Education", "Advanced Education"))
+
+# Perform logistic regression
+delivery_education_model <- glm(location_childbirth_category ~ education_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_education_model)
+
+exp(cbind(OR = coef(delivery_education_model), confint(delivery_education_model)))
+```
+```{r Delivery and Education}
+# Get results using broom
+delivery_education_result <- tidy(delivery_education_model, conf.int = TRUE, exponentiate = TRUE)
+delivery_education_result$OR <- round(delivery_education_result$estimate, 2)
+delivery_education_result$CI <- paste0("(", round(delivery_education_result$conf.low, 2), " - ", round(delivery_education_result$conf.high, 2), ")")
+delivery_education_result$p.value <- round(delivery_education_result$p.value, 3)
+
+# Print final results
+print(delivery_education_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_delivery_education <- table(data$education_category, data$location_childbirth_category)
+print("\nDistribution table:")
+print(table_delivery_education)
+print("\nPercentages by education category:")
+print(round(prop.table(table_delivery_education, 1) * 100, 2))  # Row percentages
+```
+```{r Delivery and Occupation}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$occupation_category <- factor(data$occupation_category, 
+                                levels = c("Unemployed", "Employed"))
+
+# Perform logistic regression
+delivery_occupation_model <- glm(location_childbirth_category ~ occupation_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_occupation_model)
+
+exp(cbind(OR = coef(delivery_occupation_model), confint(delivery_occupation_model)))
+```
+```{r Delivery and Occupation}
+# Get results using broom
+delivery_occupation_result <- tidy(delivery_occupation_model, conf.int = TRUE, exponentiate = TRUE)
+delivery_occupation_result$OR <- round(delivery_occupation_result$estimate, 2)
+delivery_occupation_result$CI <- paste0("(", round(delivery_occupation_result$conf.low, 2), " - ", round(delivery_occupation_result$conf.high, 2), ")")
+delivery_occupation_result$p.value <- round(delivery_occupation_result$p.value, 3)
+
+# Print final results
+print(delivery_occupation_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_delivery_occupation <- table(data$occupation_category, data$location_childbirth_category)
+print("\nDistribution table:")
+print(table_delivery_occupation)
+print("\nPercentages by occupation category:")
+print(round(prop.table(table_delivery_occupation, 1) * 100, 2))  # Row percentages
+```
+```{r Delivery and Marital Status}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$marital_category <- factor(data$marital_category, 
+                                levels = c("Single/Widow/Divorced", "Married/Cohabitants"))
+
+# Perform logistic regression
+delivery_marital_model <- glm(location_childbirth_category ~ marital_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_marital_model)
+
+exp(cbind(OR = coef(delivery_marital_model), confint(delivery_marital_model)))
+
+# Get results using broom
+delivery_marital_result <- tidy(delivery_marital_model, conf.int = TRUE, exponentiate = TRUE)
+delivery_marital_result$OR <- round(delivery_marital_result$estimate, 2)
+delivery_marital_result$CI <- paste0("(", round(delivery_marital_result$conf.low, 2), " - ", round(delivery_marital_result$conf.high, 2), ")")
+delivery_marital_result$p.value <- round(delivery_marital_result$p.value, 3)
+
+# Print final results
+print(delivery_marital_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_delivery_marital <- table(data$marital_category, data$location_childbirth_category)
+print("\nDistribution table:")
+print(table_delivery_marital)
+print("\nPercentages by marital category:")
+print(round(prop.table(table_delivery_marital, 1) * 100, 2))  # Row percentages
+```
+```{r Delivery and Ethnic Group}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$ethnic_category <- factor(data$ethnic_category, 
+                           levels = c("Indigenous",
+                                    "Other Ethnicity"))
+# Perform logistic regression
+delivery_ethnic_model <- glm(location_childbirth_category ~ ethnic_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(delivery_ethnic_model)
+
+exp(cbind(OR = coef(delivery_ethnic_model), confint(delivery_ethnic_model)))
+
+# Get results using broom
+delivery_ethnic_result <- tidy(delivery_ethnic_model, conf.int = TRUE, exponentiate = TRUE)
+delivery_ethnic_result$OR <- round(delivery_ethnic_result$estimate, 2)
+delivery_ethnic_result$CI <- paste0("(", round(delivery_ethnic_result$conf.low, 2), " - ", round(delivery_ethnic_result$conf.high, 2), ")")
+delivery_ethnic_result$p.value <- round(delivery_ethnic_result$p.value, 3)
+
+# Print final results
+print(delivery_ethnic_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_delivery_ethnic <- table(data$ethnic_category, data$location_childbirth_category)
+print("\nDistribution table:")
+print(table_delivery_ethnic)
+print("\nPercentages by ethnic category:")
+print(round(prop.table(table_delivery_ethnic, 1) * 100, 2))  # Row percentages
+```
+```{r Delivery and Parity}
+# Convert to factor and set reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$parity_category <- factor(data$parity_category, 
+                             levels = c("Primipara", "Multipara"))
+
+# Perform logistic regression
+delivery_parity_model <- glm(location_childbirth_category ~ parity_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(delivery_parity_model)
+exp(cbind(OR = coef(delivery_parity_model), confint(delivery_parity_model)))
+
+# Check distribution
+table(data$parity_category, data$location_childbirth_category)
+prop.table(table(data$parity_category, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Income category}
+# Convert to factor and set reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$income_category <- factor(data$income_category, 
+                             levels = c("Lower Income", "Higher Income"))
+
+# Perform logistic regression
+delivery_income_model <- glm(location_childbirth_category ~ income_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(delivery_income_model)
+exp(cbind(OR = coef(delivery_income_model), confint(delivery_income_model)))
+
+# Check distribution
+table(data$income_category, data$location_childbirth_category)
+prop.table(table(data$income_category, data$location_childbirth_category), 1) * 100
+```
+```{r Delivery and Income per capita - contionous}
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+
+# Perform logistic regression with continuous income per capita
+delivery_capita_model <- glm(location_childbirth_category ~ income_per_capita,
+                       family = binomial(link = "logit"),
+                       data = data,
+                       na.action = na.omit)
+
+# Get results
+summary(delivery_capita_model)
+exp(cbind(OR = coef(delivery_capita_model), confint(delivery_capita_model)))
+```
+```{r Delivery and Cost}
+# Convert to factor and set reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$delivery_cost_category <- factor(data$delivery_cost_category, 
+                             levels = c("Government/No cost", "Out of pocket"))
+
+# Perform logistic regression
+delivery_cost_model <- glm(location_childbirth_category ~ delivery_cost_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(delivery_cost_model)
+exp(cbind(OR = coef(delivery_cost_model), confint(delivery_cost_model)))
+
+# Check distribution
+table(data$delivery_cost_category, data$location_childbirth_category)
+prop.table(table(data$delivery_cost_category, data$location_childbirth_category), 1) * 100
+```
+
+###################################################################################
+# Univariate Analysis using PNC variable as an OUTCOME
+```{r PNC and Partner Education}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$parted_category <- factor(data$parted_category, 
+                               levels = c("Basic education", "Advanced education"))
+
+# Perform logistic regression
+pnc_parted_model <- glm(pnc_binary ~ parted_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_parted_model)
+
+exp(cbind(OR = coef(pnc_parted_model), confint(pnc_parted_model)))
+
+# Check distribution
+table(data$parted_category, data$pnc_binary)
+prop.table(table(data$parted_category, data$pnc_binary), 1) * 100
+```
+```{r PNC and partner occupation}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$partocc_category <- factor(data$partocc_category, 
+                               levels = c("Informal sector", "Formal sector"))
+
+# Perform logistic regression
+pnc_partocc_model <- glm(pnc_binary ~ partocc_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_partocc_model)
+
+exp(cbind(OR = coef(pnc_partocc_model), confint(pnc_partocc_model)))
+
+# Check distribution
+table(data$partocc_category, data$pnc_binary)
+prop.table(table(data$partocc_category, data$pnc_binary), 1) * 100
+```
+```{r PNC and Contraception}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$use_contraception <- factor(data$use_contraception, 
+                               levels = c("0", "1"))
+
+# Perform logistic regression
+pnc_fp_model <- glm(pnc_binary ~ use_contraception, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_fp_model)
+
+exp(cbind(OR = coef(pnc_fp_model), confint(pnc_fp_model)))
+
+# Check distribution
+table(data$use_contraception, data$pnc_binary)
+prop.table(table(data$use_contraception, data$pnc_binary), 1) * 100
+```
+```{r PNC and PHC Transport Cost}
+# Perform logistic regression
+# Convert to factor and set the reference level
+data_cleaned_phccost$pnc_binary <- factor(data_cleaned_phccost$pnc_binary, 
+                                                levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+pnc_phccost_model <- glm(pnc_binary ~ phc_transport_cost_per_trip,
+                         family = binomial(link = "logit"),
+                         data = data_cleaned_phccost)
+
+# View summary
+summary(pnc_phccost_model)
+
+# Calculate odds ratios with confidence intervals
+exp(cbind(OR = coef(pnc_phccost_model), confint(pnc_phccost_model)))
+
+# Check distribution
+table(data_cleaned_phccost$phc_transport_cost_per_trip, 
+      data_cleaned_phccost$pnc_binary)
+
+# Proportion table
+prop.table(table(data_cleaned_phccost$phc_transport_cost_per_trip, 
+                 data_cleaned_phccost$pnc_binary), 1) * 100
+```
+```{r PNC and food insecurity}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$food_insecurity_three_months <- factor(data$food_insecurity_three_months, 
+                               levels = c("0", "1"))
+# Perform logistic regression
+pnc_food_model <- glm(pnc_binary ~ food_insecurity_three_months, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_food_model)
+
+exp(cbind(OR = coef(pnc_food_model), confint(pnc_food_model)))
+
+# Check distribution
+table(data$food_insecurity_three_months, data$pnc_binary)
+prop.table(table(data$food_insecurity_three_months, data$pnc_binary), 1) * 100
+```
+```{r PNC and Age at first childbirth}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$age_first_category <- factor(data$age_first_category, 
+                               levels = c("young reproductive age", "older reproductive age"))
+# Perform logistic regression
+pnc_agefirst_model <- glm(pnc_binary ~ age_first_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_agefirst_model)
+
+exp(cbind(OR = coef(pnc_agefirst_model), confint(pnc_agefirst_model)))
+
+# Check distribution
+table(data$age_first_category, data$pnc_binary)
+prop.table(table(data$age_first_category, data$pnc_binary), 1) * 100
+```
+```{r PNC and Age at first childbirth contionius}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+pnc_agefirstcont_model <- glm(pnc_binary ~ age_first_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_agefirstcont_model)
+
+exp(cbind(OR = coef(pnc_agefirstcont_model), confint(pnc_agefirstcont_model)))
+
+# Check distribution
+table(data$age_first_childbirth, data$pnc_binary)
+prop.table(table(data$age_first_childbirth, data$pnc_binary), 1) * 100
+```
+```{r PNC and age}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$age_category <- factor(data$age_category, 
+                               levels = c("young reproductive age", "older reproductive age"))
+# Perform logistic regression
+pnc_age_model <- glm(pnc_binary ~ age_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_age_model)
+
+exp(cbind(OR = coef(pnc_age_model), confint(pnc_age_model)))
+
+# Check distribution
+table(data$age_category, data$pnc_binary)
+prop.table(table(data$age_category, data$pnc_binary), 1) * 100
+```
+```{r PNC and age contionus}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+pnc_agecont_model <- glm(pnc_binary ~ age, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_agecont_model)
+
+exp(cbind(OR = coef(pnc_agecont_model), confint(pnc_agecont_model)))
+
+# Check distribution
+table(data$age, data$pnc_binary)
+prop.table(table(data$age, data$pnc_binary), 1) * 100
+```
+```{r PNC and Mode of transportation}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$transport_category <- factor(data$transport_category, 
+                               levels = c("walking", "vehicle"))
+
+# Perform logistic regression
+pnc_transport_model <- glm(pnc_binary ~ transport_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_transport_model)
+
+exp(cbind(OR = coef(pnc_transport_model), confint(pnc_transport_model)))
+
+# Check distribution
+table(data$transport_category, data$pnc_binary)
+prop.table(table(data$transport_category, data$pnc_binary), 1) * 100
+```
+```{r PNC and PHC travel distance}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$phc_distance_category <- factor(data$phc_distance_category, 
+                               levels = c("<=30 minutes", ">30 minutes"))
+
+# Perform logistic regression
+pnc_phcdistance_model <- glm(pnc_binary ~ phc_distance_category, 
+             family = binomial(link = "logit"), 
+             data = data)
+
+summary(pnc_phcdistance_model)
+
+exp(cbind(OR = coef(pnc_phcdistance_model), confint(pnc_phcdistance_model)))
+
+# Check distribution
+table(data$phc_distance_category, data$pnc_binary)
+prop.table(table(data$phc_distance_category, data$pnc_binary), 1) * 100
+```
+```{r PNC and ANC}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+pnc_anc_model <- glm(pnc_binary ~ anc_visit_binary, 
+             family = binomial(link = "logit"), 
+             data= data)
+
+summary(pnc_anc_model)
+
+exp(cbind(OR = coef(pnc_anc_model), confint(pnc_anc_model)))
+
+# Check distribution
+table(data$anc_visit_binary, data$pnc_binary)
+prop.table(table(data$anc_visit_binary, data$pnc_binary), 1) * 100
+```
+```{r PNC and Delivery}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+pnc_delivery_model <- glm(pnc_binary ~ location_childbirth_category, 
+             family = binomial(link = "logit"), 
+             data= data)
+
+summary(pnc_delivery_model)
+
+exp(cbind(OR = coef(pnc_delivery_model), confint(pnc_delivery_model)))
+
+# Check distribution
+table(data$location_childbirth_category, data$pnc_binary)
+prop.table(table(data$location_childbirth_category, data$pnc_binary), 1) * 100
+```
+```{r PNC and Education}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$education_category <- factor(data$education_category, 
+                                levels = c("Basic Education", "Advanced Education"))
+
+# Perform logistic regression
+pnc_education_model <- glm(pnc_binary ~ education_category, 
+             family = binomial(link = "logit"), 
+             data= data)
+
+summary(pnc_education_model)
+
+exp(cbind(OR = coef(pnc_education_model), confint(pnc_education_model)))
+
+# Get results using broom
+pnc_education_result <- tidy(pnc_education_model, conf.int = TRUE, exponentiate = TRUE)
+pnc_education_result$OR <- round(pnc_education_result$estimate, 2)
+pnc_education_result$CI <- paste0("(", round(pnc_education_result$conf.low, 2), " - ", round(pnc_education_result$conf.high, 2), ")")
+pnc_education_result$p.value <- round(pnc_education_result$p.value, 3)
+
+# Print final results
+print(pnc_education_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_pnc_education <- table(data$education_category, data$pnc_binary)
+print("\nDistribution table:")
+print(table_pnc_education)
+print("\nPercentages by education category:")
+print(round(prop.table(table_pnc_education, 1) * 100, 2))  # Row percentages
+```
+```{r PNC and Occupation}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$occupation_category <- factor(data$occupation_category, 
+                                levels = c("Unemployed", "Employed"))
+
+# Perform logistic regression
+pnc_occupation_model <- glm(pnc_binary ~ occupation_category, 
+             family = binomial(link = "logit"), 
+             data= data)
+
+summary(pnc_occupation_model)
+
+exp(cbind(OR = coef(pnc_occupation_model), confint(pnc_occupation_model)))
+
+# Get results using broom
+pnc_occupation_result <- tidy(pnc_occupation_model, conf.int = TRUE, exponentiate = TRUE)
+pnc_occupation_result$OR <- round(pnc_occupation_result$estimate, 2)
+pnc_occupation_result$CI <- paste0("(", round(pnc_occupation_result$conf.low, 2), " - ", round(pnc_occupation_result$conf.high, 2), ")")
+pnc_occupation_result$p.value <- round(pnc_occupation_result$p.value, 3)
+
+# Print final results
+print(pnc_occupation_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_pnc_occupation <- table(data$occupation_category, data$pnc_binary)
+print("\nDistribution table:")
+print(table_pnc_occupation)
+print("\nPercentages by occupation category:")
+print(round(prop.table(table_pnc_occupation, 1) * 100, 2))  # Row percentages
+```
+```{r PNC and Marital Status}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$marital_category <- factor(data$marital_category, 
+                                levels = c("Single/Widow/Divorced", "Married/Cohabitants"))
+
+# Perform logistic regression
+pnc_marital_model <- glm(pnc_binary ~ marital_category, 
+             family = binomial(link = "logit"), 
+             data= data)
+
+summary(pnc_marital_model)
+
+exp(cbind(OR = coef(pnc_marital_model), confint(pnc_marital_model)))
+
+# Get results using broom
+pnc_marital_result <- tidy(pnc_marital_model, conf.int = TRUE, exponentiate = TRUE)
+pnc_marital_result$OR <- round(pnc_marital_result$estimate, 2)
+pnc_marital_result$CI <- paste0("(", round(pnc_marital_result$conf.low, 2), " - ", round(pnc_marital_result$conf.high, 2), ")")
+pnc_marital_result$p.value <- round(pnc_marital_result$p.value, 3)
+
+# Print final results
+print(pnc_marital_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_pnc_marital <- table(data$marital_category, data$pnc_binary)
+print("\nDistribution table:")
+print(table_pnc_marital)
+print("\nPercentages by marital category:")
+print(round(prop.table(table_pnc_marital, 1) * 100, 2))  # Row percentages
+```
+```{r PNC and Ethnic Group}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$ethnic_category <- factor(data$ethnic_category, 
+                           levels = c("Indigenous ethnic group of Tambrauw",
+                                    "Indigenous ethnic group outside Tambrauw", 
+                                    "Other Ethnicity"))
+
+# Perform logistic regression
+pnc_ethnic_model <- glm(pnc_binary ~ ethnic_category, 
+             family = binomial(link = "logit"), 
+             data= data)
+
+summary(pnc_ethnic_model)
+
+exp(cbind(OR = coef(pnc_ethnic_model), confint(pnc_ethnic_model)))
+
+# Get results using broom
+pnc_ethnic_result <- tidy(pnc_ethnic_model, conf.int = TRUE, exponentiate = TRUE)
+pnc_ethnic_result$OR <- round(pnc_ethnic_result$estimate, 2)
+pnc_ethnic_result$CI <- paste0("(", round(pnc_ethnic_result$conf.low, 2), " - ", round(pnc_ethnic_result$conf.high, 2), ")")
+pnc_ethnic_result$p.value <- round(pnc_ethnic_result$p.value, 3)
+
+# Print final results
+print(pnc_ethnic_result[, c("term", "OR", "CI", "p.value")])
+
+# Distribution table
+table_pnc_ethnic <- table(data$ethnic_category, data$pnc_binary)
+print("\nDistribution table:")
+print(table_pnc_ethnic)
+print("\nPercentages by ethnic category:")
+print(round(prop.table(table_pnc_ethnic, 1) * 100, 2))  # Row percentages
+```
+```{r PNC and Parity}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$parity_category <- factor(data$parity_category, 
+                             levels = c("Primipara", "Multipara"))
+
+# Perform logistic regression
+pnc_parity_model <- glm(pnc_binary ~ parity_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(pnc_parity_model)
+exp(cbind(OR = coef(pnc_parity_model), confint(pnc_parity_model)))
+
+# Check distribution
+table(data$parity_category, data$pnc_binary)
+prop.table(table(data$parity_category, data$pnc_binary), 1) * 100
+```
+```{r PNC and income}
+# Convert to factor and set reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$income_category <- factor(data$income_category, 
+                             levels = c("Lower Income", "Higher Income"))
+
+# Perform logistic regression
+pnc_income_model <- glm(pnc_binary ~ income_category, 
+                       family = binomial(link = "logit"), 
+                       data = data)
+
+# Get results
+summary(pnc_income_model)
+exp(cbind(OR = coef(pnc_income_model), confint(pnc_income_model)))
+
+# Check distribution
+table(data$income_category, data$pnc_binary)
+prop.table(table(data$income_category, data$pnc_binary), 1) * 100
+```
+```{r PNC and income per capita - continous}
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+# Perform logistic regression with continuous income per capita
+pnc_capita_model <- glm(pnc_binary ~ income_per_capita,
+                       family = binomial(link = "logit"),
+                       data = data,
+                       na.action = na.omit)
+
+# Get results
+summary(pnc_capita_model)
+exp(cbind(OR = coef(pnc_capita_model), confint(pnc_capita_model)))
+```
+```{r PNC and PNC facility}
+# Convert to factor and set reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$pnc_place_category <- factor(data$pnc_place_category, 
+                               levels = c("Primary Healthcare", "Advanced Healthcare"))
+# Perform logistic regression
+pnc_facility_model <- glm(pnc_binary ~ pnc_place_category, 
+                         family = binomial(link = "logit"), 
+                         data = data)
+# Get results
+summary(pnc_facility_model)
+exp(cbind(OR = coef(pnc_facility_model), confint(pnc_facility_model)))
+
+# Check distribution
+table(data$pnc_place_category, data$pnc_binary)
+prop.table(table(data$pnc_place_category, data$pnc_binary), 1) * 100
+```
+
+##################################################################################
+# Cost Range
+```{r ANC Service}
+# First replace 99 with NA
+data$anc_cost_service[data$anc_cost_service == 99] <- NA
+
+anc_service_summary <- data %>%
+  summarize(
+    Min = min(anc_cost_service, na.rm = TRUE),
+    Max = max(anc_cost_service, na.rm = TRUE),
+    Mean = round(mean(anc_cost_service, na.rm = TRUE), 2),
+    SD = round(sd(anc_cost_service, na.rm = TRUE), 2)
+  )
+# Print the results
+print(anc_service_summary)
+```
+```{r ANC transportation}
+# First replace 99 with NA
+data$anc_cost_transportation[data$anc_cost_transportation == 99] <- NA
+
+anc_transport_summary <- data %>%
+  summarize(
+    Min = min(anc_cost_transportation, na.rm = TRUE),
+    Max = max(anc_cost_transportation, na.rm = TRUE),
+    Mean = round(mean(anc_cost_transportation, na.rm = TRUE), 2),
+    SD = round(sd(anc_cost_transportation, na.rm = TRUE), 2)
+  )
+# Print the results
+print(anc_transport_summary)
+```
+```{r ANC Meds/Vitamin}
+# First replace 99 with NA
+data$anc_cost_meds[data$anc_cost_meds == 99] <- NA
+
+anc_meds_summary <- data %>%
+  summarize(
+    Min = min(anc_cost_meds, na.rm = TRUE),
+    Max = max(anc_cost_meds, na.rm = TRUE),
+    Mean = round(mean(anc_cost_meds, na.rm = TRUE), 2),
+    SD = round(sd(anc_cost_meds, na.rm = TRUE), 2)
+  )
+# Print the results
+print(anc_meds_summary)
+```
+```{r ANC lab}
+# First replace 99 with NA
+data$anc_cost_lab[data$anc_cost_lab == 99] <- NA
+
+anc_lab_summary <- data %>%
+  summarize(
+    Min = min(anc_cost_lab, na.rm = TRUE),
+    Max = max(anc_cost_lab, na.rm = TRUE),
+    Mean = round(mean(anc_cost_lab, na.rm = TRUE), 2),
+    SD = round(sd(anc_cost_lab, na.rm = TRUE), 2)
+  )
+# Print the results
+print(anc_lab_summary)
+```
+```{r ANC Others}
+# First replace 99 with NA
+data$anc_cost_others_detail[data$anc_cost_others_detail == 99] <- NA
+
+anc_others_summary <- data %>%
+  summarize(
+    Min = min(anc_cost_others_detail, na.rm = TRUE),
+    Max = max(anc_cost_others_detail, na.rm = TRUE),
+    Mean = round(mean(anc_cost_others_detail, na.rm = TRUE), 2),
+    SD = round(sd(anc_cost_others_detail, na.rm = TRUE), 2)
+  )
+# Print the results
+print(anc_others_summary)
+```
+```{r homebirth Service}
+# First replace 99 with NA
+data$delivery_home_cost_service[data$delivery_home_cost_service == 99] <- NA
+
+homebirth_service_summary <- data %>%
+  summarize(
+    Min = min(delivery_home_cost_service, na.rm = TRUE),
+    Max = max(delivery_home_cost_service, na.rm = TRUE),
+    Mean = round(mean(delivery_home_cost_service, na.rm = TRUE), 2),
+    SD = round(sd(delivery_home_cost_service, na.rm = TRUE), 2)
+  )
+# Print the results
+print(homebirth_service_summary)
+```
+```{r Homebirth meds}
+# First replace 99 with NA
+data$delivery_home__cost_meds[data$delivery_home__cost_meds == 99] <- NA
+
+homebirth_meds_summary <- data %>%
+  summarize(
+    Min = min(delivery_home__cost_meds, na.rm = TRUE),
+    Max = max(delivery_home__cost_meds, na.rm = TRUE),
+    Mean = round(mean(delivery_home__cost_meds, na.rm = TRUE), 2),
+    SD = round(sd(delivery_home__cost_meds, na.rm = TRUE), 2)
+  )
+# Print the results
+print(homebirth_meds_summary)
+```
+```{r Homebirth others}
+# First replace 99 with NA
+data$delivery_home_cost_others_by_numbers[data$delivery_home_cost_others_by_numbers == 99] <- NA
+
+homebirth_others_summary <- data %>%
+  summarize(
+    Min = min(delivery_home_cost_others_by_numbers, na.rm = TRUE),
+    Max = max(delivery_home_cost_others_by_numbers, na.rm = TRUE),
+    Mean = round(mean(delivery_home_cost_others_by_numbers, na.rm = TRUE), 2),
+    SD = round(sd(delivery_home_cost_others_by_numbers, na.rm = TRUE), 2)
+  )
+# Print the results
+print(homebirth_others_summary)
+```
+```{r HF service}
+# First replace 99 with NA
+data$delivery_hf_cost_service[data$delivery_hf_cost_service == 99] <- NA
+
+hf_service_summary <- data %>%
+  summarize(
+    Min = min(delivery_hf_cost_service, na.rm = TRUE),
+    Max = max(delivery_hf_cost_service, na.rm = TRUE),
+    Mean = round(mean(delivery_hf_cost_service, na.rm = TRUE), 2),
+    SD = round(sd(delivery_hf_cost_service, na.rm = TRUE), 2)
+  )
+# Print the results
+print(hf_service_summary)
+```
+```{r HF meds}
+# First replace 99 with NA
+data$delivery_hf_cost_meds[data$delivery_hf_cost_meds == 99] <- NA
+
+hf_meds_summary <- data %>%
+  summarize(
+    Min = min(delivery_hf_cost_meds, na.rm = TRUE),
+    Max = max(delivery_hf_cost_meds, na.rm = TRUE),
+    Mean = round(mean(delivery_hf_cost_meds, na.rm = TRUE), 2),
+    SD = round(sd(delivery_hf_cost_meds, na.rm = TRUE), 2)
+  )
+# Print the results
+print(hf_meds_summary)
+```
+```{r HF others}
+# First replace 99 with NA
+data$delivery_hf_cost_others_by_numbers[data$delivery_hf_cost_others_by_numbers == 99] <- NA
+
+hf_others_summary <- data %>%
+  summarize(
+    Min = min(delivery_hf_cost_others_by_numbers, na.rm = TRUE),
+    Max = max(delivery_hf_cost_others_by_numbers, na.rm = TRUE),
+    Mean = round(mean(delivery_hf_cost_others_by_numbers, na.rm = TRUE), 2),
+    SD = round(sd(delivery_hf_cost_others_by_numbers, na.rm = TRUE), 2)
+  )
+# Print the results
+print(hf_others_summary)
+```
+```{r HF transportation}
+# First replace 99 with NA
+data$delivery_hf_cost_transportation[data$delivery_hf_cost_transportation == 99] <- NA
+
+hf_transportation_summary <- data %>%
+  summarize(
+    Min = min(delivery_hf_cost_transportation, na.rm = TRUE),
+    Max = max(delivery_hf_cost_transportation, na.rm = TRUE),
+    Mean = round(mean(delivery_hf_cost_transportation, na.rm = TRUE), 2),
+    SD = round(sd(delivery_hf_cost_transportation, na.rm = TRUE), 2)
+  )
+# Print the results
+print(hf_transportation_summary)
+```
+
+#################################################################################
+# Graphic
+```{r Maternal health continuum}
+
+library (dplyr)
+library (ggplot2)
+
+# First, let's create the summary data
+n_total <- nrow(data)
+
+cascade_summary <- data.frame(
+  stage = factor(c(
+    # Level 1: All participants
+    "Study Population",
+    # Level 2: ANC status
+    "No ANC", "Had ANC",
+    # Level 3: ANC visit adequacy
+    "Inadequate ANC", "Adequate ANC",
+    # Level 4: Delivery location
+    "Non-institutional", "Institutional",
+    # Level 5: PNC status
+    "No PNC", "PNC mother & child"
+  ), levels = c(
+    "Study Population",
+    "No ANC", "Had ANC",
+    "Inadequate ANC", "Adequate ANC",
+    "Non-institutional", "Institutional",
+    "No PNC", "PNC mother & child"
+  )),
+  value = c(
+    
+    # Calculate each level
+    n_total,
+    sum(data$doing_anc == 0),
+    sum(data$doing_anc == 1),
+    sum(data$anc_visit_binary == "Inadequate", na.rm = TRUE),
+    sum(data$anc_visit_binary == "Adequate", na.rm = TRUE),
+    sum(data$location_childbirth_category == "Non-institutional childbirth", na.rm = TRUE),
+    sum(data$location_childbirth_category == "Institutional childbirth", na.rm = TRUE),
+    sum(data$pnc_binary == "Inadequate", na.rm = TRUE),
+    sum(data$pnc_binary == "Adequate", na.rm = TRUE)
+  ),
+  level = c(1,
+           rep(2, 2),
+           rep(3, 2),
+           rep(4, 2),
+           rep(5, 2))
+)
+# Calculate percentages
+cascade_summary <- cascade_summary %>%
+  group_by(level) %>%
+  mutate(percentage = value/sum(value) * 100) %>%
+  ungroup()
+
+# Create the plot
+ggplot(cascade_summary, 
+       aes(x = level, y = value)) +
+  geom_bar(stat = "identity", 
+           fill = "lightblue",    # Fill color
+           color = "white",       # Border color
+           width = 0.7) +         # Width of bars
+  geom_text(aes(label = sprintf("%s\n(n=%d)\n%.1f%%", 
+                               stage, value, percentage)),
+            size = 3) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title = element_blank(),
+        panel.grid = element_blank()) +
+  scale_x_continuous(expand = c(0.1, 0.1)) +
+  labs(title = "Maternal Care Cascade")
+```
+```{r Maternal Continuum Cascade}
+
+# Create cascade data
+cascade_data <- data %>%
+  summarise(
+    # Total population
+    total = n(),
+    
+    # 1. Any ANC (starting point)
+    anc_yes = sum(doing_anc == 1),
+    
+    # 2. ANC 4+ (among those who had any ANC)
+    anc4_adequate = sum(doing_anc == 1 & 
+                       anc_visit_binary == "Adequate", 
+                       na.rm = TRUE),
+    
+    # 3. ANC 4+ AND Institutional delivery
+    anc4_inst = sum(doing_anc == 1 & 
+                   anc_visit_binary == "Adequate" & 
+                   location_childbirth_category == "Institutional childbirth", 
+                   na.rm = TRUE),
+    
+    # 4. ANC 4+ AND Institutional AND any PNC (mother/child/either)
+    anc4_inst_pnc = sum(doing_anc == 1 & 
+                       anc_visit_binary == "Adequate" & 
+                       location_childbirth_category == "Institutional childbirth" &
+                       (pnc_category %in% c("Mother and Child", "Either one")),
+                       na.rm = TRUE),
+    
+    # 5. Complete cascade: ANC 4+ AND Institutional AND adequate PNC
+    complete = sum(doing_anc == 1 & 
+                  anc_visit_binary == "Adequate" & 
+                  location_childbirth_category == "Institutional childbirth" &
+                  pnc_binary == "Adequate", 
+                  na.rm = TRUE)
+  )
+
+# Create plotting data
+plot_data <- data.frame(
+  stage = c("Total\nrespondents",
+            "ANC", 
+            "ANC 4+", 
+            "ANC 4+ and\nInstitutional delivery",
+            "ANC 4+, Institutional\ndelivery, and PNC", 
+            "ANC 4+, Institutional\ndelivery, PNC\nmother and child"),
+  value = c(cascade_data$total,
+            cascade_data$anc_yes,
+            cascade_data$anc4_adequate,
+            cascade_data$anc4_inst,
+            cascade_data$anc4_inst_pnc,
+            cascade_data$complete),
+  percentage = c(cascade_data$total/cascade_data$total * 100,
+                cascade_data$anc_yes/cascade_data$total * 100,
+                cascade_data$anc4_adequate/cascade_data$total * 100,
+                cascade_data$anc4_inst/cascade_data$total * 100,
+                cascade_data$anc4_inst_pnc/cascade_data$total * 100,
+                cascade_data$complete/cascade_data$total * 100)
+)
+# Calculate percentages based on total population
+plot_data$percentage <- (plot_data$value / plot_data$value[1]) * 100
+
+# For proper cascade visualization, ensure stages are in order
+plot_data$stage <- factor(plot_data$stage, levels = plot_data$stage)
+```
+```{r ggplot cascade }
+# Using the same cascade_data and plot_data from before
+ggplot(plot_data, aes(x = stage, y = percentage, group = 1)) +
+  # Add shaded area
+  geom_area(fill = "lightblue", alpha = 0.3) +
+  # Add connecting lines
+  geom_line(color = "steelblue", size = 1) +
+  # Add points
+  geom_point(color = "steelblue", size = 4) +
+  # Add labels
+  geom_text(aes(label = sprintf("n=%d\n%.1f%%", value, percentage)),
+            vjust = -1) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  ) +
+  labs(
+    x = NULL,
+    y = "Percentage (%)",
+    title = "Maternal Care Cascade"
+  ) +
+  scale_y_continuous(limits = c(0, max(plot_data$percentage) * 1.2))
+# For JPEG format
+ggsave("maternal_cascade.jpg", width = 10, height = 6, dpi = 300)
+
+```
+```{r Waterfall}
+library(waterfall)
+# Create waterfall data
+# We need to calculate the differences between steps
+waterfall_data <- data.frame(
+  labels = c("ANC", 
+            "ANC 4+", 
+            "ANC 4+ &\nInstitutional delivery",
+            "ANC 4+, Institutional delivery \n& PNC", 
+            "Complete\nmaternal care"),
+  values = c(
+    cascade_data$anc_yes/cascade_data$total * 100,                    # First bar
+    (cascade_data$anc4_adequate - cascade_data$anc_yes)/cascade_data$total * 100,  # Drop to ANC 4+
+    (cascade_data$anc4_inst - cascade_data$anc4_adequate)/cascade_data$total * 100, # Drop to Inst delivery
+    (cascade_data$anc4_inst_pnc - cascade_data$anc4_inst)/cascade_data$total * 100, # Drop to any PNC
+    (cascade_data$complete - cascade_data$anc4_inst_pnc)/cascade_data$total * 100   # Drop to complete care
+  )
+)
+# Create the waterfall plot with basic arguments
+waterfall(
+  values = waterfall_data$values,
+  labels = waterfall_data$labels,
+  calc_total = TRUE
+)
+
+waterfall_chart(
+  values = waterfall_data$values,
+  labels = waterfall_data$labels,
+  show_values = TRUE,
+  total = TRUE
+)
+```
+```{r Reasons for Choosing ANC Facility}
+# Create a long format dataset for plotting
+library(ggplot2)
+anc_reasons <- data.frame(
+  reason = c("Facility close to home", "Affordable cost", "Comprehensive services",
+             "Good quality care", "Good service reputation", "Family suggested facility",
+             "Personal connection with providers", "Convenient operating hours",
+             "Provide complete medication", "Respectful and friendly providers",
+             "Preference for female doctor", "Others", "Facility is clean"),
+  percentage = c(69.27, 28.78, 16.59, 14.63, 11.71, 4.39, 4.39, 3.90, 
+                3.90, 3.41, 0.98, 0.98, 0.49)
+) %>%
+  arrange(desc(percentage))
+
+# Create the plot
+ggplot(anc_reasons, aes(x = reorder(reason, percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() + # Flip coordinates for horizontal bars
+  theme_minimal() +
+  labs(
+    title = "Reasons for Choosing ANC Facility",
+    x = "",
+    y = "Percentage (%)"
+  ) +
+  theme(
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(size = 14, face = "bold"),
+    panel.grid.major.y = element_blank()
+  ) +
+  geom_text(aes(label = sprintf("%.1f%%", percentage)), 
+            hjust = -0.2, 
+            size = 3.5)
+
+# For JPEG format
+ggsave("Reasons for Choosing ANC Facility.jpg", width = 10, height = 6, dpi = 300)
+```
+```{r Reasons for Not Doing ANC}
+# Create the data frame
+library(ggplot2)
+library(dplyr)
+
+no_anc_reasons <- data.frame(
+  reason = c("Unrecognized pregnancy", 
+            "Elect not to seek ANC", 
+            "Non-marital pregnancy",
+            "Facility far from home",
+            "Financial constraints"),
+  n = c(5, 3, 2, 2, 1),
+  percentage = c(35.71, 21.43, 14.29, 14.29, 7.14)
+) %>%
+  arrange(desc(percentage))
+
+# Create the plot with adjusted margins
+ggplot(no_anc_reasons, aes(x = reorder(reason, percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Reasons for Not Doing ANC",
+    subtitle = "n = 13 (3 respondents did not answer)",
+    x = "",
+    y = "Percentage (%)"
+  ) +
+  theme(
+    axis.text.y = element_text(size = 11),
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 10, color = "gray50"),
+    panel.grid.major.y = element_blank(),
+    plot.margin = margin(r = 40, l = 10, t = 20, b = 20)
+  ) +
+  # Memperluas skala x untuk mengakomodasi label
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.2)),  # Menambah ruang di sebelah kanan
+    limits = c(0, 40)  # Menyesuaikan batas maksimum
+  ) +
+  geom_text(aes(label = sprintf("%.1f%% (n=%d)", percentage, n)), 
+            hjust = -0.2, 
+            size = 3.5)
+
+# For JPEG format
+ggsave("Reasons for Not Doing ANC.jpg", width = 10, height = 6, dpi = 300)
+```
+```{r Reasons why people deliver at home}
+home_delivery_reasons <- data.frame(
+  reason = c("The facility is too far",
+             "Felt safe with home delivery",
+             "Lack of money",
+             "Inadequate facility services",
+             "Unaware of operating hours",
+             "Miscalculated due date",
+             "Sudden labour",
+             "Cultural value",
+             "Closeness to family/provider"),
+  n = c(38, 11, 8, 5, 5, 5, 5, 4, 3),
+  percentage = c(26.39, 7.64, 5.56, 3.47, 3.47, 3.47, 3.47, 2.78, 2.08)
+) %>%
+  arrange(desc(percentage))
+
+# Create the plot
+ggplot(home_delivery_reasons, aes(x = reorder(reason, percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Reasons for Home Delivery",
+    x = "",
+    y = "Percentage (%)"
+  ) +
+  theme(
+    axis.text.y = element_text(size = 11),
+    plot.title = element_text(size = 14, face = "bold"),
+    panel.grid.major.y = element_blank(),
+    plot.margin = margin(r = 40, l = 10, t = 20, b = 20)
+  ) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.2)),
+    limits = c(0, 30)
+  ) +
+  geom_text(aes(label = sprintf("%.1f%% (n=%d)", percentage, n)), 
+            hjust = -0.2, 
+            size = 3.5)
+```
+```{r Reasons delivery at health facility}
+# Sort data by frequency
+result_reason_hf_delivery <- result_reason_hf_delivery %>%
+  arrange(desc(Frequency))
+# Create the plot
+ggplot(result_reason_hf_delivery, aes(x = reorder(Reason, Frequency), y = Frequency)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Reasons for Choosing Health Facility Delivery",
+    x = "",
+    y = "Frequency"
+  ) +
+  theme(
+    axis.text.y = element_text(size = 11),
+    plot.title = element_text(size = 14, face = "bold"),
+    panel.grid.major.y = element_blank(),
+    plot.margin = margin(r = 40, l = 10, t = 20, b = 20)
+  ) +
+  geom_text(aes(label = sprintf("%.1f%% (n=%d)", Percentage, Frequency)), 
+            hjust = -0.2, 
+            size = 3.5) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.2)),
+    limits = c(0, max(result_reason_hf_delivery$Frequency) * 1.2)
+  )
+```
+```{r}
+frequency_table <- table(data$income_per_capita)
+print(frequency_table) 
+
+library(dplyr)
+summary_statsinome <- data %>% 
+  summarise( Mean = mean(income_per_capita, na.rm = TRUE), 
+             SD = sd(income_per_capita, na.rm = TRUE), 
+             Min = min(income_per_capita, na.rm = TRUE), 
+             Max = max(income_per_capita, na.rm = TRUE) )
+print(summary_statsinome)
+```
+```{r ANC cost summary box plot}
+# Create a data frame combining all the summary statistics
+anc_cost_summary <- data.frame(
+  Category = c("Service", "Transportation", "Medicines/Vitamins", "Laboratory", "Others"),
+  Min = c(anc_service_summary$Min, anc_transport_summary$Min, 
+          anc_meds_summary$Min, anc_lab_summary$Min, anc_others_summary$Min),
+  Max = c(anc_service_summary$Max, anc_transport_summary$Max, 
+          anc_meds_summary$Max, anc_lab_summary$Max, anc_others_summary$Max),
+  Mean = c(anc_service_summary$Mean, anc_transport_summary$Mean, 
+           anc_meds_summary$Mean, anc_lab_summary$Mean, anc_others_summary$Mean),
+  SD = c(anc_service_summary$SD, anc_transport_summary$SD, 
+         anc_meds_summary$SD, anc_lab_summary$SD, anc_others_summary$SD)
+)
+
+# Make sure all categories are treated the same way
+ggplot(anc_cost_summary, aes(x = Category, ymin = Min, lower = Mean - SD, 
+                       middle = Mean, upper = Mean + SD, ymax = Max)) +
+  geom_boxplot(stat = "identity", fill = "skyblue", alpha = 0.7, color = "black") +
+  scale_y_continuous(labels = scales::comma, 
+                     name = "Cost (Rp)",
+                     limits = c(0, max(anc_cost_summary$Max) * 1.1)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 10, color = "black")
+  ) +
+  labs(
+    title = "ANC Cost Range by Category",
+    subtitle = "Based on Min, Max, Mean, and Standard Deviation",
+    x = ""
+  ) +
+  geom_text(aes(y = Mean, label = scales::comma(Mean, accuracy = 1)), 
+            vjust = -1, size = 3)
+```
+```{r Homebirth and cost summary box plot}
+# Create a data frame combining all the summary statistics
+homebirth_cost_summary <- data.frame(
+  Category = c("Service", "Medicines/Vitamins", "Others"),
+  Min = c(homebirth_service_summary$Min, homebirth_meds_summary$Min, homebirth_others_summary$Min),
+  Max = c(homebirth_service_summary$Max,homebirth_meds_summary$Max, homebirth_others_summary$Max),
+  Mean = c(homebirth_service_summary$Mean,homebirth_meds_summary$Mean, homebirth_others_summary$Mean),
+  SD = c(homebirth_service_summary$SD, homebirth_meds_summary$SD, homebirth_others_summary$SD)
+)
+
+# Make sure all categories are treated the same way
+ggplot(homebirth_cost_summary, aes(x = Category, ymin = Min, lower = Mean - SD, 
+                       middle = Mean, upper = Mean + SD, ymax = Max)) +
+  geom_boxplot(stat = "identity", fill = "skyblue", alpha = 0.7, color = "black") +
+  scale_y_continuous(labels = scales::comma, 
+                     name = "Cost (Rp)",
+                     limits = c(0, max(homebirth_cost_summary$Max) * 1.1)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 10, color = "black")
+  ) +
+  labs(
+    title = "Homebirth Cost Range by Category",
+    subtitle = "Based on Min, Max, Mean, and Standard Deviation",
+    x = ""
+  ) +
+  geom_text(aes(y = Mean, label = scales::comma(Mean, accuracy = 1)), 
+            vjust = -1, size = 3)
+```
+```{r Healh facility birth and cost summary box plot}
+# Create a data frame combining all the summary statistics
+hf_cost_summary <- data.frame(
+  Category = c("Service", "Transportation", "Medicines/Vitamins", "Others"),
+  Min = c(hf_service_summary$Min, hf_transportation_summary$Min, hf_meds_summary$Min, hf_others_summary$Min),
+  Max = c(hf_service_summary$Max, hf_transportation_summary$Max, hf_meds_summary$Max, hf_others_summary$Max),
+  Mean = c(hf_service_summary$Mean,hf_transportation_summary$Mean, hf_meds_summary$Mean, hf_others_summary$Mean),
+  SD = c(hf_service_summary$SD,hf_transportation_summary$SD,hf_meds_summary$SD, hf_others_summary$SD)
+)
+
+# Make sure all categories are treated the same way
+ggplot(hf_cost_summary, aes(x = Category, ymin = Min, lower = Mean - SD, 
+                       middle = Mean, upper = Mean + SD, ymax = Max)) +
+  geom_boxplot(stat = "identity", fill = "steelblue", alpha = 0.7, color = "black") +
+  scale_y_continuous(labels = scales::comma, 
+                     name = "Cost (Rp)",
+                     limits = c(0, max(hf_cost_summary$Max) * 1.1)) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 10, color = "black")
+  ) +
+  labs(
+    title = "Health Facility Delivery Cost Range by Category",
+    subtitle = "Based on Min, Max, Mean, and Standard Deviation",
+    x = ""
+  ) +
+  geom_text(aes(y = Mean, label = scales::comma(Mean, accuracy = 1)), 
+            vjust = -1, size = 3)
+```
+```{r Bar graph of dependent outcome}
+
+# Hitung jumlah dan persentase untuk setiap indikator
+# Any ANC
+any_anc_n <- sum(data$pregnancy_anc == 1 | data$pregnancy_anc == "yes", na.rm = TRUE)
+any_anc_pct <- mean(data$pregnancy_anc == 1 | data$pregnancy_anc == "yes", na.rm = TRUE) * 100
+
+# Early ANC - adjusted variable name
+early_anc_n <- sum(data$early_anc == 1 | data$early_anc == "early anc", na.rm = TRUE)
+early_anc_pct <- mean(data$early_anc == 1 | data$early_anc == "early anc", na.rm = TRUE) * 100
+
+# 4+ ANC
+anc_4plus_n <- sum(data$anc_visit_binary == 1 | data$anc_visit_binary == "Adequate", na.rm = TRUE)
+anc_4plus_pct <- mean(data$anc_visit_binary == 1 | data$anc_visit_binary == "Adequate", na.rm = TRUE) * 100
+
+# 4+ ANC and early - adjusted variable names
+anc_4plus_early_n <- sum((data$early_anc == 1 | data$early_anc == "early anc") & 
+                       (data$anc_visit_binary == 1 | data$anc_visit_binary == "Adequate"), na.rm = TRUE)
+anc_4plus_early_pct <- mean((data$early_anc == 1 | data$early_anc == "early anc") & 
+                         (data$anc_visit_binary == 1 | data$anc_visit_binary == "Adequate"), na.rm = TRUE) * 100
+
+# Birth in facility
+facility_birth_n <- sum(data$location_childbirth_category == 1 | 
+                      data$location_childbirth_category == "Institutional childbirth", na.rm = TRUE)
+facility_birth_pct <- mean(data$location_childbirth_category == 1 | 
+                         data$location_childbirth_category == "Institutional childbirth", na.rm = TRUE) * 100
+
+# Any PNC - adjusted variable name
+any_pnc_n <- sum(data$early_pnc == 1 | data$early_pnc == "any pnc", na.rm = TRUE)
+any_pnc_pct <- mean(data$early_pnc == 1 | data$early_pnc == "any pnc", na.rm = TRUE) * 100
+
+# PNC mother and child
+pnc_mother_child_n <- sum(data$pnc_binary == 1 | data$pnc_binary == "Adequate", na.rm = TRUE)
+pnc_mother_child_pct <- mean(data$pnc_binary == 1 | data$pnc_binary == "Adequate", na.rm = TRUE) * 100
+
+# Buat data frame untuk plotting - fixed variable name
+plot_data_sep <- data.frame(
+  Indicator = c("Any ANC", "Early ANC", "4+ ANC", "4+ ANC and\nearly", 
+                "Birth in\nfacility", "Any PNC", "PNC mother\nand child"),
+  Percentage = c(any_anc_pct, early_anc_pct, anc_4plus_pct, anc_4plus_early_pct, 
+                facility_birth_pct, any_pnc_pct, pnc_mother_child_pct),
+  Count = c(any_anc_n, early_anc_n, anc_4plus_n, anc_4plus_early_n, 
+           facility_birth_n, any_pnc_n, pnc_mother_child_n)
+)
+
+# Urutkan indikator sesuai contoh grafik
+plot_data_sep$Indicator <- factor(plot_data_sep$Indicator, 
+                             levels = c("Any ANC", "Early ANC", "4+ ANC", "4+ ANC and\nearly", 
+                                        "Birth in\nfacility","Any PNC", "PNC mother\nand child"))
+
+# Buat bar graph
+# Create bar graph with more space at the top for labels
+ggplot(plot_data_sep, aes(x = Indicator, y = Percentage)) +
+  geom_bar(stat = "identity", fill = "#4472C4", width = 0.7) +
+  # Add percentage and count as labels
+  geom_text(aes(label = sprintf("%.1f%%\n(n=%d)", Percentage, Count)), 
+            vjust = -0.7, size = 3.5) +
+  theme_minimal() +
+  labs(y = "", 
+       x = "") +
+  theme(
+    axis.text.y = element_text(size = 11),
+    axis.text.x = element_text(size = 11),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    plot.margin = margin(t = 40, r = 20, b = 20, l = 20)  # Add more top margin
+  ) +
+  # Increase the y-axis limit to make room for labels
+  scale_y_continuous(limits = c(0, 120), breaks = seq(0, 100, by = 10), 
+                     labels = function(x) paste0(x, "%"))
+
+# Then save it using ggsave
+ggsave("maternal_health_indicators.png", width = 10, height = 7, dpi = 300)
+```
+
+# Graphic forest plot
+```{r anc}
+# Create dataframe with the study results
+data_anc <- data.frame(
+  variable = c(
+    "Ethnicity – Other ethnicity", 
+    "Age at first childbirth – Older reproductive age (> 20 years old)",
+    "ANC place – Advanced healthcare (hospital)",
+    "Use contraception",
+    "Partner education level – Advanced education",
+    "Wealth Index",
+    "Parity - Multipara",
+    "Male engagement – Good involvement"
+  ),
+  
+  # Model 1a
+  ORanc_1a = c(1.91, 2.42, 0.29, 1.65, 0.56, 0.99, 1.55, 1.19),
+  loweranc_CI_1a = c(0.81, 1.12, 0.13, 0.80, 0.22, 0.97, 0.71, 0.40),
+  upperanc_CI_1a = c(4.80, 5.31, 0.63, 3.41, 1.32, 1.00, 3.36, 3.33),
+  panc_value_1a = c(0.151, 0.026, 0.002, 0.174, 0.197, 0.186, 0.268, 0.748),
+  
+  # Model 2a
+  ORanc_2a = c(1.92, 2.49, 0.29, 1.68, 0.57, 0.99, 1.54, NA),
+  loweranc_CI_2a = c(0.81, 1.17, 0.13, 0.82, 0.23, 0.97, 0.71, NA),
+  upperanc_CI_2a = c(4.81, 5.36, 0.63, 3.45, 1.33, 1.01, 3.34, NA),
+  panc_value_2a = c(0.148, 0.018, 0.002, 0.154, 0.207, 0.185, 0.274, NA),
+  
+  # Model 3a
+  ORanc_3a = c(1.84, 2.33, 0.28, 1.74, 0.57, 0.99, NA, NA),
+  loweranc_CI_3a = c(0.78, 1.11, 0.12, 0.86, 0.23, 0.97, NA, NA),
+  upperanc_CI_3a = c(4.61, 4.93, 0.61, 3.55, 1.32, 1.01, NA, NA),
+  panc_value_3a = c(0.177, 0.026, 0.001, 0.127, 0.201, 0.224, NA, NA),
+  
+  # Model 4a
+  ORanc_4a = c(2.22, 2.27, 0.28, 1.83, 0.61, NA, NA, NA),
+  loweranc_CI_4a = c(0.99, 1.09, 0.13, 0.91, 0.25, NA, NA, NA),
+  upperanc_CI_4a = c(5.30, 4.78, 0.61, 3.71, 1.41, NA, NA, NA),
+  panc_value_4a = c(0.059, 0.029, 0.001, 0.092, 0.263, NA, NA, NA),
+  
+  # Model 5a
+  ORanc_5a = c(2.34, 1.93, 0.23, 2.03, NA, NA, NA, NA),
+  loweranc_CI_5a = c(1.06, 0.98, 0.11, 1.05, NA, NA, NA, NA),
+  upperanc_CI_5a = c(5.54, 3.82, 0.48, 3.99, NA, NA, NA, NA),
+  panc_value_5a = c(0.042, 0.057, 0.000, 0.038, NA, NA, NA, NA)
+)
+
+# Restructure the data for plotting
+long_data_anc <- data %>%
+  pivot_longer(
+    cols = starts_with(c("OR_", "lower_CI_", "upper_CI_", "p_value_")),
+    names_to = c(".value", "model"),
+    names_pattern = "(.+)_(.+)"
+  ) %>%
+  filter(!is.na(OR))
+
+# Add significance indicators
+long_data_anc <- long_data %>%
+  mutate(
+    significance = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01 ~ "**",
+      p_value < 0.05 ~ "*",
+      TRUE ~ ""
+    ),
+    label = paste0(sprintf("%.2f", OR), " (", sprintf("%.2f", lower_CI), "-", sprintf("%.2f", upper_CI), ")", significance)
+  )
+
+# Create a factor for the variables to control their order
+long_data_anc$variable <- factor(long_data_anc$variable, levels = unique(data$variable))
+
+# Create a custom color palette for the models
+model_colors_anc <- c("1a" = "#1B9E77", "2a" = "#D95F02", "3a" = "#7570B3", "4a" = "#E7298A", "5a" = "#66A61E")
+
+# Create a version with text labels only from Model 3a
+model_3a_labels <- long_data %>%
+  filter(model == "3a") %>%
+  select(variable, OR, lower_CI, upper_CI, label)
+
+forest_plot_anc_with_labels <- ggplot(long_data_anc, aes(y = variable)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50") +
+  geom_errorbarh(aes(xmin = lower_CI, xmax = upper_CI, x = OR, color = model), 
+                height = 0.2, position = position_dodge(width = 0.5)) +
+  geom_point(aes(x = OR, color = model), position = position_dodge(width = 0.5), size = 3) +
+  # Add text labels only for Model 3a
+  geom_text(data = model_3a_labels, 
+            aes(x = upper_CI + 0.5, label = label), 
+            hjust = 0, size = 3, color = model_colors["3a"]) +
+  scale_x_log10(breaks = c(0.1, 0.2, 0.5, 1, 2, 5, 10), limits = c(0.1, 35)) +
+  scale_color_manual(values = model_colors, name = "Model") +
+  labs(
+    x = "Odds Ratio (log scale)",
+    y = "",
+    caption = "* p < 0.05, ** p < 0.01, *** p < 0.001"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    legend.position = "bottom",
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(size = 12, face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+# Display the alternative plot
+print(forest_plot_anc_with_labels)
+
+# Save the alternative plot if needed
+# ggsave("anc_forest_plot_with_labels.png", forest_plot_with_labels, width = 14, height = 8, dpi = 300)
+```
+```{r delivery} 
+# Create dataframe with the study results for institutional childbirth
+data_delivery <- data.frame(
+  variable = c(
+    "Mother Education Level – Advanced education",
+    "Parity – Multipara",
+    "Delivery payment category – Out of pocket",
+    "Partner education level – Advanced education",
+    "Male engagement – Good involvement",
+    "Ethnicity – Other ethnicity",
+    "Wealth Index",
+    "Partner Occupation – Formal sector"
+  ),
+  
+  # Model 1b
+  ORdlv_1b = c(2.38, 0.23, 1.99, 3.09, 2.70, 1.88, 1.01, 1.33),
+  lowerdlv_CI_1b = c(1.00, 0.11, 0.96, 1.30, 0.89, 0.81, 0.99, 0.64),
+  upperdlv_CI_1b = c(6.06, 0.48, 4.19, 7.93, 10.23, 4.49, 1.03, 2.77),
+  pdlv_value_1b = c(0.057, 0.000, 0.066, 0.014, 0.102, 0.147, 0.152, 0.443),
+  
+  # Model 2b
+  ORdlv_2b = c(2.34, 0.23, 2.01, 3.06, 2.78, 1.86, 1.01, NA),
+  lowerdlv_CI_2b = c(1.01, 0.11, 0.98, 1.29, 0.91, 0.81, 0.99, NA),
+  upperdlv_CI_2b = c(5.77, 0.48, 4.25, 7.83, 10.16, 4.39, 1.03, NA),
+  pdlv_value_2b = c(0.053, 0.000, 0.061, 0.014, 0.091, 0.151, 0.186, NA),
+  
+  # Model 3b
+  ORdlv_3b = c(2.33, 0.23, 2.12, 2.97, 2.80, 1.79, NA, NA),
+  lowerdlv_CI_3b = c(1.01, 0.11, 1.04, 1.26, 0.92, 0.79, NA, NA),
+  upperdlv_CI_3b = c(5.76, 0.47, 4.42, 7.50, 10.12, 4.17, NA, NA),
+  pdlv_value_3b = c(0.052, 0.000, 0.041, 0.015, 0.088, 0.166, NA, NA),
+  
+  # Model 4b
+  ORdlv_4b = c(2.34, 0.23, 2.20, 2.95, 2.94, NA, NA, NA),
+  lowerdlv_CI_4b = c(1.02, 0.11, 1.10, 1.27, 0.98, NA, NA, NA),
+  upperdlv_CI_4b = c(5.74, 0.47, 4.53, 7.36, 11.14, NA, NA, NA),
+  pdlv_value_4b = c(0.051, 0.000, 0.028, 0.015, 0.076, NA, NA, NA)
+)
+
+# Restructure the data for plotting - FIXED COLUMN PATTERN
+long_data_dlv <- data_delivery %>%
+  pivot_longer(
+    cols = starts_with(c("ORdlv_", "lowerdlv_CI_", "upperdlv_CI_", "pdlv_value_")),
+    names_to = c(".value", "model"),
+    names_pattern = "(\\w+)_(\\w+)"
+  ) %>%
+  mutate(
+    OR = ORdlv,
+    lower_CI = lowerdlv_CI,
+    upper_CI = upperdlv_CI,
+    p_value = pdlv_value
+  ) %>%
+  filter(!is.na(OR))
+
+# Add significance indicators
+long_data_dlv <- long_data_dlv %>%
+  mutate(
+    significance = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01 ~ "**",
+      p_value < 0.05 ~ "*",
+      TRUE ~ ""
+    ),
+    # Create more compact labels for better fit
+    label = paste0(sprintf("%.2f", OR), " (", 
+                  sprintf("%.2f", lower_CI), "-", 
+                  sprintf("%.2f", ifelse(upper_CI > 9.99, 9.99, upper_CI)), ")", 
+                  significance)
+  )
+
+# Create a factor for the variables to control their order
+long_data_dlv$variable <- factor(long_data_dlv$variable, levels = unique(data_delivery$variable))
+
+# Create a custom color palette for the models
+model_colors <- c("1b" = "#1B9E77", "2b" = "#D95F02", "3b" = "#7570B3", "4b" = "#E7298A")
+
+# Extract only Model 4b labels - CHANGED FROM 3b TO 4b
+model_4b_labels_dlv <- long_data_dlv %>%
+  filter(model == "4b") %>%
+  select(variable, OR, lower_CI, upper_CI, label)
+
+# Create the forest plot with labels only from Model 4b - CHANGED FROM 3b TO 4b
+forest_plot_dlv <- ggplot(long_data_dlv, aes(y = variable)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50") +
+  geom_errorbarh(aes(xmin = lower_CI, xmax = upper_CI, x = OR, color = model), 
+                height = 0.2, position = position_dodge(width = 0.5)) +
+  geom_point(aes(x = OR, color = model), position = position_dodge(width = 0.5), size = 3) +
+  # Add text labels only for Model 4b - CHANGED FROM 3b TO 4b
+  geom_text(data = model_4b_labels_dlv, 
+            aes(x = upper_CI + 0.2, label = label), 
+            hjust = 0, size = 2, color = model_colors["4b"]) +
+  scale_x_log10(breaks = c(0.1, 0.2, 0.5, 1, 2, 5, 10), limits = c(0.1, 50)) +
+  scale_color_manual(values = model_colors, name = "Model") +
+  labs(
+    x = "Odds Ratio (log scale)",
+    y = "",
+    caption = "* p < 0.05, ** p < 0.01, *** p < 0.001"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    legend.position = "bottom",
+    axis.text.y = element_text(size = 11),
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+# Display the plot
+print(forest_plot_dlv)
+
+# Save the plot with a wider width to prevent truncation
+ggsave("institutional_childbirth_forest_plot.png", forest_plot_dlv, width = 14, height = 8, dpi = 300)
+
+```
+```{r PNC}
+# Create dataframe with the study results for adequate PNC
+data_pnc <- data.frame(
+  variable = c(
+    "Mother occupation category - Employed",
+    "PNC place – Advanced healthcare (hospital)",
+    "Transportation category - Vehicle",
+    "Age at first childbirth – Older reproductive age",
+    "Partner education level – Advanced education"
+  ),
+  
+  # Model 1c
+  OR_1c = c(6.15, 4.64, 0.11, 1.63, 1.33),
+  lower_CI_1c = c(2.37, 1.64, 0.03, 0.63, 0.47),
+  upper_CI_1c = c(17.43, 14.10, 0.30, 4.43, 3.95),
+  p_value_1c = c(0.000, 0.005, 0.000, 0.324, 0.594),
+  
+  # Model 2c
+  OR_2c = c(4.52, 3.84, 0.17, 2.28, NA),
+  lower_CI_2c = c(1.95, 1.49, 0.07, 0.98, NA),
+  upper_CI_2c = c(11.06, 10.36, 0.42, 5.63, NA),
+  p_value_2c = c(0.000, 0.006, 0.000, 0.063, NA),
+  
+  # Model 3c
+  OR_3c = c(4.34, 4.00, 0.19, NA, NA),
+  lower_CI_3c = c(1.91, 1.58, 0.07, NA, NA),
+  upper_CI_3c = c(10.35, 10.67, 0.45, NA, NA),
+  p_value_3c = c(0.000, 0.004, 0.000, NA, NA)
+)
+
+# Restructure the data for plotting
+long_data_pnc <- data_pnc %>%
+  pivot_longer(
+    cols = starts_with(c("OR_", "lower_CI_", "upper_CI_", "p_value_")),
+    names_to = c(".value", "model"),
+    names_pattern = "(.+)_(.+)"
+  ) %>%
+  filter(!is.na(OR))
+
+# Add significance indicators
+long_data_pnc <- long_data_pnc %>%
+  mutate(
+    significance = case_when(
+      p_value < 0.001 ~ "***",
+      p_value < 0.01 ~ "**",
+      p_value < 0.05 ~ "*",
+      TRUE ~ ""
+    ),
+    # Create more compact labels for better fit
+    label = paste0(sprintf("%.2f", OR), " (", 
+                  sprintf("%.2f", lower_CI), "-", 
+                  sprintf("%.2f", ifelse(upper_CI > 9.99, 9.99, upper_CI)), ")", 
+                  significance)
+  )
+
+# Create a factor for the variables to control their order
+long_data_pnc$variable <- factor(long_data_pnc$variable, levels = unique(data_pnc$variable))
+
+# Create a custom color palette for the models
+model_colors <- c("1c" = "#1B9E77", "2c" = "#D95F02", "3c" = "#7570B3")
+
+# Extract only Model 1c labels
+model_1c_labels <- long_data_pnc %>%
+  filter(model == "1c") %>%
+  select(variable, OR, lower_CI, upper_CI, label)
+
+# Create the forest plot with labels only from Model 1c
+forest_plot_pnc <- ggplot(long_data_pnc, aes(y = variable)) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "gray50") +
+  geom_errorbarh(aes(xmin = lower_CI, xmax = upper_CI, x = OR, color = model), 
+                height = 0.2, position = position_dodge(width = 0.5)) +
+  geom_point(aes(x = OR, color = model), position = position_dodge(width = 0.5), size = 3) +
+  # Add text labels only for Model 1c
+  geom_text(data = model_1c_labels, 
+            aes(x = upper_CI + 0.2, label = label), 
+            hjust = 0, size = 2, color = model_colors["1c"]) +
+  scale_x_log10(breaks = c(0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50), limits = c(0.01, 70)) +
+  scale_color_manual(values = model_colors, name = "Model") +
+  labs(
+    x = "Odds Ratio (log scale)",
+    y = "",
+    caption = "* p < 0.05, ** p < 0.01, *** p < 0.001"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    legend.position = "bottom",
+    axis.text.y = element_text(size = 11),
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 12)
+  )
+
+# Display the plot
+print(forest_plot_pnc)
+
+# Save the plot with a wider width to prevent truncation
+ggsave("adequate_pnc_forest_plot.png", forest_plot_pnc, width = 14, height = 7, dpi = 300)
+```
+
+
+#################################################################################
+# PCA Household Index
+```{r Subset the data into pci}
+library(dplyr)
+#Create a subset data for pci
+pci <- data %>% 
+select("owns_home",           
+  "people_at_home",      
+  "total_bedroom", 
+  "source_water", 
+  "source_electricity",
+  "source_cooking",
+  "type_toilet", 
+  "asset_plot", 
+  "asset_refrigerator",
+  "asset_tv", 
+  "asset_radio", 
+  "asset_hp", 
+  "asset_car", 
+  "asset_computer", 
+  "asset_bicycle", 
+  "asset_motorcycle", 
+  "asset_furniture", 
+  "asset_cooker", 
+  "asset_cattle", 
+  "asset_poultry"
+)
+
+
+# Clean column names
+colnames(pci) <- c(
+  "owns_home",
+  "people_at_home",
+  "total_bedroom", 
+  "source_water", 
+  "source_electricity",
+  "source_cooking",
+  "type_toilet", 
+  "asset_plot", 
+  "asset_refrigerator",
+  "asset_tv", 
+  "asset_radio", 
+  "asset_hp", 
+  "asset_car", 
+  "asset_computer", 
+  "asset_bicycle", 
+  "asset_motorcycle", 
+  "asset_furniture", 
+  "asset_cooker", 
+  "asset_cattle", 
+  "asset_poultry" 
+)
+```
+```{r Categorical variables}
+# First, identify the categorical variables
+categorical_vars <- c(
+  "owns_home", 
+  "source_water", 
+  "type_toilet",
+  "source_electricity")
+
+# Convert people_at_home and total_bedroom to numeric
+pci$total_bedroom <- as.numeric(pci$total_bedroom)
+
+# Create dummy variables for all categorical variables
+pci_dummies <- data.frame(matrix(ncol = 0, nrow = nrow(pci)))
+
+for(var in categorical_vars) {
+  # Convert to factor
+  factor_var <- as.factor(pci[[var]])
+  # Create dummy variables (one-hot encoding)
+  dummies <- model.matrix(~ factor_var - 1)
+  # Rename columns
+  colnames(dummies) <- paste0(var, "_", levels(factor_var))
+  # Add to dummy dataframe
+  pci_dummies <- cbind(pci_dummies, dummies)
+}
+```
+```{r Binary variables}
+# Get the binary asset variables
+binary_vars <- c(
+  "asset_plot", 
+  "asset_refrigerator", 
+  "asset_tv", 
+  "asset_radio", 
+  "asset_hp", 
+  "asset_car", 
+  "asset_computer", 
+  "asset_bicycle", 
+  "asset_motorcycle", 
+  "asset_furniture", 
+  "asset_cooker", 
+  "asset_cattle", 
+  "asset_poultry")
+
+# Convert binary variables to numeric
+for(var in binary_vars) {
+  pci[[var]] <- as.numeric(pci[[var]])
+}
+```
+```{r Combined the PCA}
+# Combine the numeric variables (assets + continuous) with dummy variables
+numeric_vars <- c("total_bedroom")
+pci_numeric <- pci[, c(numeric_vars, binary_vars)]
+pci_combined <- cbind(pci_numeric, pci_dummies)
+
+# Handle missing values
+for(i in 1:ncol(pci_combined)) {
+  if(is.numeric(pci_combined[[i]])) {
+    pci_combined[[i]][is.na(pci_combined[[i]])] <- mean(pci_combined[[i]], na.rm = TRUE)
+  }
+}
+
+```
+```{r Running the PCA}
+# Now perform standard PCA on the prepared data
+pca_result <- prcomp(pci_combined, scale. = TRUE)
+
+# Extract the first principal component scores
+pci_scores <- pca_result$x[, 1]
+
+# Scale to 0-100 range for easier interpretation
+pci_scaled <- 100 * (pci_scores - min(pci_scores)) / (max(pci_scores) - min(pci_scores))
+
+# Add back to original data
+data$pci_new <- pci_scaled
+
+print(pca_result)
+print(pci_scores)
+print(pci_scaled)
+```
+```{r Visual}
+# Examine variable contributions
+loadings <- pca_result$rotation[, 1]
+contrib <- loadings^2 / sum(loadings^2) * 100
+contrib_sorted <- sort(contrib, decreasing = TRUE)
+
+# Plot the top 20 contributors to the first principal component
+barplot(contrib_sorted[1:min(20, length(contrib_sorted))], 
+        las = 2, cex.names = 0.7,
+        main = "Top Contributors")
+```
+# PCA and Outcome
+```{r ANC and PCI}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+anc_pci_model <- glm(anc_visit_binary ~ pci_new, 
+             family = binomial, 
+             data = data)
+
+summary(anc_pci_model)
+
+exp(cbind(OR = coef(anc_pci_model), confint(anc_pci_model)))
+
+# Check distribution
+table(data$pci_new, data$anc_visit_binary)
+prop.table(table(data$pci_new, data$anc_visit_binary), 1) * 100
+```
+```{r Delivery and PCI}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+
+# Perform logistic regression
+delivery_pci_model <- glm(location_childbirth_category ~ pci_new, 
+             family = binomial, 
+             data = data)
+
+summary(delivery_pci_model)
+
+exp(cbind(OR = coef(delivery_pci_model), confint(delivery_pci_model)))
+
+# Check distribution
+table(data$pci_new, data$location_childbirth_category)
+prop.table(table(data$pci_new, data$location_childbirth_category), 1) * 100
+```
+```{r PNC and PCI}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+
+# Perform logistic regression
+pnc_pci_model <- glm(pnc_binary ~ pci_new, 
+             family = binomial, 
+             data = data)
+
+summary(pnc_pci_model)
+
+exp(cbind(OR = coef(pnc_pci_model), confint(pnc_pci_model)))
+
+# Check distribution
+table(data$pci_new, data$pnc_binary)
+prop.table(table(data$pci_new, data$pnc_binary), 1) * 100
+```
+
+#################################################################################
+# Male Engagement Index (Sum)
+```{r Subset the data}
+# Male engagement variables - these column names need to match your actual data
+male_vars <- data %>%
+  select("husband_attended_anc",            
+  "husband_provided_transport",       
+  "husband_present_at_delivery",      
+  "husband_discussed_with_provider", 
+  "husband_cared_for_child_at_home",  
+  "husband_bathed_newborn",          
+  "husband_bought_baby_items",        
+  "husband_present_for_immunization", 
+  "husband_helped_with_breastfeeding" 
+)
+```
+```{r Sum of male engagement}
+# Create male involvement sum and categorization
+data <- data %>%
+  mutate(
+    # Sum all male involvement binary variables
+    male_sum = rowSums(across(all_of(c(
+      "husband_provided_transport",
+      "husband_discussed_with_provider",
+      "husband_cared_for_child_at_home",
+      "husband_bathed_newborn",
+      "husband_bought_baby_items",
+      "husband_present_for_immunization",
+      "husband_helped_with_breastfeeding"
+    )), as.numeric), na.rm = TRUE),
+    
+    # Create categorization: ≥5 = Good involvement, <5 = Less involvement
+    male_category = ifelse(male_sum >= 4, 
+                                 "Good involvement", 
+                                 "Less involvement"),
+    
+    # Convert to factor with appropriate reference level
+    male_category = factor(male_category, 
+                                 levels = c("Less involvement", "Good involvement"))
+  )
+table(data$male_category)
+```
+# Male Engagement Index and Outcome
+```{r ANC and Male Engagement}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$anc_visit_binary <- factor(data$anc_visit_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$male_category = factor(data$male_category, 
+                                 levels = c("Less involvement", "Good involvement"))
+
+# Perform logistic regression
+anc_male_model <- glm(anc_visit_binary ~ male_category, 
+             family = binomial, 
+             data = data)
+
+summary(anc_male_model)
+
+exp(cbind(OR = coef(anc_male_model), confint(anc_male_model)))
+
+# Check distribution
+table(data$male_category, data$anc_visit_binary)
+prop.table(table(data$male_category, data$anc_visit_binary), 1) * 100
+```
+```{r Delivery and Male engagement}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$location_childbirth_category <- factor(data$location_childbirth_category, 
+                               levels = c("Non-institutional childbirth", "Institutional childbirth"))
+data$male_category = factor(data$male_category, 
+                                 levels = c("Less involvement", "Good involvement"))
+
+# Perform logistic regression
+delivery_male_model <- glm(location_childbirth_category ~ male_category, 
+             family = binomial, 
+             data = data)
+
+summary(delivery_male_model)
+
+exp(cbind(OR = coef(delivery_male_model), confint(delivery_male_model)))
+
+# Check distribution
+table(data$male_category, data$location_childbirth_category)
+prop.table(table(data$male_category, data$location_childbirth_category), 1) * 100
+```
+```{r PNC and male engagement}
+#Perform logistic regression
+#Convert to factor and set the reference level
+data$pnc_binary <- factor(data$pnc_binary, 
+                               levels = c("Inadequate", "Adequate"))
+data$male_category = factor(data$male_category, 
+                                 levels = c("Less involvement", "Good involvement"))
+
+# Perform logistic regression
+pnc_male_model <- glm(pnc_binary ~ male_category, 
+             family = binomial, 
+             data = data)
+
+summary(pnc_male_model)
+
+exp(cbind(OR = coef(pnc_male_model), confint(pnc_male_model)))
+
+# Check distribution
+table(data$male_category, data$pnc_binary)
+prop.table(table(data$male_category, data$pnc_binary), 1) * 100
+```
+
+#################################################################################
+#####.  MULTIVARIATE ANALYSIS ##########################################
+# ANC as an OUTCOME
+```{r ANC multivariate analysis}
+data$use_contraception <- as.factor(data$use_contraception)
+data$age_first_category <- as.factor(data$age_first_category)
+data$age_category <- as.factor(data$age_category)
+data$transport_category <- as.factor(data$transport_category)
+data$marital_category <- as.factor(data$marital_category)
+data$ethnic_category <- as.factor(data$ethnic_category)
+data$parity_category <- as.factor(data$parity_category)
+data$male_category <- as.factor(data$male_category)
+data$anc_place_category <- as.factor(data$anc_place_category)
+
+# Ensure pci_new is numeric
+data$pci_new <- as.numeric(data$pci_new)
+
+anc_multivariate_model1 <- glm(anc_visit_binary ~ 
+                                 ethnic_category +
+                                 anc_place_category +
+                                 use_contraception,
+                                
+                                 
+                               
+                                 
+                                data = data, 
+                                family = binomial)
+
+
+summary(anc_multivariate_model1)
+
+# Get odds ratios and confidence intervals
+exp(cbind(OR = coef(anc_multivariate_model1), confint(anc_multivariate_model1)))
+```
+```{r Check mediation}
+ library(mediation)
+
+# Create predictor matrices
+X1 <- model.matrix(~ marital_category + age_category + ethnic_category + 
+                    use_contraception, data = data)
+X2 <- model.matrix(~ marital_category + anc_place_category + age_category + 
+                   ethnic_category + use_contraception, data = data)
+
+# Get common rows
+common_rows <- intersect(rownames(na.omit(X1)), rownames(na.omit(X2)))
+common_data <- data[as.numeric(common_rows), ]
+
+# Now run models on common data
+med_model <- glm(anc_place_category ~ marital_category + age_category + 
+                ethnic_category + use_contraception, 
+                family = binomial, data = common_data)
+
+out_model <- glm(anc_visit_binary ~ marital_category + anc_place_category + 
+               age_category + ethnic_category + use_contraception, 
+               family = binomial, data = common_data)
+
+summary(med_model)
+summary(out_model)
+```
+```{r Install Performance for Pseudo R2}
+library(performance)
+```
+```{r Cek Pseudo R2 and glance}
+library(performance)
+library(broom)
+
+anc_r2_values <- r2_nagelkerke(anc_multivariate_model1)
+print(anc_r2_values)
+
+anc_model_diagnostics <- glance(anc_multivariate_model1)
+print(anc_model_diagnostics)
+```
+```{r ANC VIF}
+library(car)
+# Calculate VIF values
+vif_anc_values <- vif(anc_multivariate_model1)
+
+# Print the VIF values
+print(vif_anc_values)
+```
+
+# Delivery as an Outcome
+```{r Delivery Multivariate Analysis}
+# Ensure the outcome variable is a factor (binary)
+data$location_childbirth_category <- as.factor(data$location_childbirth_category)
+
+#Ensure the predictors are factor
+data$age_first_category <- as.factor(data$age_first_category)
+data$education_category <- as.factor(data$education_category)
+data$transport_category <- as.factor(data$transport_category)
+data$marital_category <- as.factor(data$marital_category)
+data$ethnic_category <- as.factor(data$ethnic_category)
+data$parity_category <- as.factor(data$parity_category)
+data$male_category <- as.factor(data$male_category)
+data$delivery_payment_category <- data$delivery_payment_category
+data$parted_category <- as.factor(data$parted_category)
+
+# Ensure pci_new is numeric
+data$pci_new <- as.numeric(data$pci_new)
+
+# Fit the multivariate logistic regression model
+delivery_multivariate_model1 <- glm(location_childbirth_category ~ 
+                          education_category +
+                            parity_category +
+                            delivery_payment_category +
+                            parted_category +
+                            male_category,
+                          
+             data = data, 
+             family = binomial)
+
+# Display summary of the model
+summary(delivery_multivariate_model1)
+
+# Get odds ratios and confidence intervals
+exp(cbind(OR = coef(delivery_multivariate_model1), confint(delivery_multivariate_model1)))
+
+```
+```{r Psedo R and Glance}
+delivery_r2_values <- r2_nagelkerke(delivery_multivariate_model1)
+print(delivery_r2_values)
+
+delivery_model_diagnostics <- glance(delivery_multivariate_model1)
+print(delivery_model_diagnostics)
+```
+```{r Delivery VIF}
+# Calculate VIF values
+vif_delivery_values <- vif(delivery_multivariate_model1)
+
+# Print the VIF values
+print(vif_delivery_values)
+```
+
+# PNC as an Outcome
+```{r PNC Multivariate Analysis}
+# Ensure the outcome variable is a factor (binary)
+data$pnc_binary <- as.factor(data$pnc_binary)
+
+#Ensure the predictors are factor
+data$age_category <- as.factor(data$age_category)
+data$age_first_category <- as.factor(data$age_first_category)
+data$occupation_category <- as.factor(data$occupation_category)
+data$transport_category <- as.factor(data$transport_category)
+data$pnc_place_category <- data$pnc_place_category
+data$parted_category <- as.factor(data$parted_category)
+
+# Ensure pci_new is numeric
+data$pci_new <- as.numeric(data$pci_new)
+
+# Fit the multivariate logistic regression model
+pnc_multivariate_model1 <- glm(pnc_binary ~ 
+                          occupation_category +
+                            pnc_place_category +
+                            transport_category,
+             data = data, 
+             family = binomial)
+
+# Display summary of the model
+summary(pnc_multivariate_model1)
+
+# Get odds ratios and confidence intervals
+exp(cbind(OR = coef(pnc_multivariate_model1), confint(pnc_multivariate_model1)))
+
+```
+```{r Pseudo R2 and Glance}
+pnc_r2_values <- r2_nagelkerke(pnc_multivariate_model1)
+print(pnc_r2_values)
+
+pnc_model_diagnostics <- glance(pnc_multivariate_model1)
+print(pnc_model_diagnostics)
+```
+```{r PNC VIF}
+# Calculate VIF values
+vif_pnc_values <- vif(pnc_multivariate_model1)
+
+# Print the VIF values
+print(vif_pnc_values)
+```
+
+################################################################################
+####### STEPWISE REGRESSION #######
+```{r Set the working library}
+# Load libraries
+library(MASS)     # For stepAIC function
+library(stats)    # For step function (already part of base R, no need to install)
+library(car)      # For vif function to check multicollinearity
+library(pROC)     # For ROC curve analysis
+library(caret)
+```
+```{r ANC stepwise}
+# Create a complete cases dataset before modeling
+complete_data_anc <- na.omit(data[, c("anc_visit_binary", "ethnic_category", "age_first_childbirth", 
+                                "parity_category", "pci_new", "anc_place_category", 
+                                "parted_category", "male_category", "use_contraception")])
+
+# Check how many rows remain after removing missing values
+print(paste("Original data rows:", nrow(data)))
+print(paste("Complete data rows:", nrow(complete_data_anc)))
+
+# Create the full model with the complete dataset
+anc_full_model <- glm(anc_visit_binary ~ ethnic_category + age_first_childbirth + 
+                     parity_category + pci_new + anc_place_category + 
+                     parted_category + male_category + use_contraception,
+                     family = binomial(link = "logit"), 
+                     data = complete_data_anc)
+
+# Summary of the full model
+summary(anc_full_model)
+
+# Check for multicollinearity
+vif(anc_full_model)
+
+# Perform backward stepwise elimination using AIC criterion
+anc_backward_model <- step(anc_full_model, direction = "backward", trace = TRUE)
+
+# Summary of the final model
+summary(anc_backward_model)
+
+# Calculate odds ratios and confidence intervals for the final model
+exp(cbind(OR = coef(anc_backward_model), confint(anc_backward_model)))
+```
+```{r ROC curve - trial}
+
+# Get predicted probabilities from your final backward model
+predicted_probs_anc <- predict(anc_backward_model, type = "response")
+
+# Create ROC curve object
+roc_anc <- roc(complete_data_anc$anc_visit_binary, predicted_probs_anc)
+
+# Calculate AUC (Area Under the Curve)
+auc_value_anc <- auc(roc_anc)
+cat("AUC:", round(auc_value_anc, 3), "\n")
+
+# Plot basic ROC curve
+plot(roc_anc, main = paste("ROC Curve (AUC =", round(auc_value_anc, 3), ")"),
+     col = "blue", lwd = 2)
+abline(a = 0, b = 1, lty = 2, col = "gray") 
+
+# Create a better ROC curve with ggplot2
+roc_data_anc <- data.frame(
+  specificity = 1 - roc_anc$specificities,
+  sensitivity = roc_anc$sensitivities
+)
+
+ggplot_roc_anc <- ggplot(roc_data_anc, aes(x = specificity, y = sensitivity)) +
+  geom_line(color = "blue", size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray") +
+  labs(
+    title = paste("ROC Curve for ANC Model (AUC =", round(auc_value_anc, 3), ")"),
+    x = "False Positive Rate (1 - Specificity)",
+    y = "True Positive Rate (Sensitivity)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+
+print(ggplot_roc_anc)
+```
+```{r Confusion matrix - trial}
+# Find optimal cutpoint using Youden's J statistic (maximizes sensitivity + specificity - 1)
+coords_obj_anc <- coords(roc_anc, "best", best.method = "youden")
+optimal_cutpoint_anc <- coords_obj_anc$threshold
+cat("Optimal probability threshold:", round(optimal_cutpoint_anc, 3), "\n")
+
+# Create binary predictions using the optimal threshold
+predicted_classes_anc <- ifelse(predicted_probs_anc >= optimal_cutpoint_anc, 1, 0)
+
+# Create confusion matrix
+conf_matrix_anc <- confusionMatrix(
+  factor(predicted_classes_anc, levels = c(0, 1)),
+  factor(complete_data_anc$anc_visit_binary, levels = c(0, 1)),
+  positive = "1"  # Specify that 1 (adequate ANC) is the positive class
+)
+
+# Print confusion matrix and related statistics
+print(conf_matrix_anc)
+
+# Create a more visually appealing confusion matrix for display
+conf_table_anc <- table(
+  Predicted = ifelse(predicted_classes_anc == 1, "Adequate ANC", "Inadequate ANC"),
+  Actual = ifelse(complete_data_anc$anc_visit_binary == 1, "Adequate ANC", "Inadequate ANC")
+)
+
+print(conf_table_anc)
+
+# Calculate performance metrics manually for reporting
+TP <- conf_matrix_anc$table[2, 2]  # True Positives
+TN <- conf_matrix_anc$table[1, 1]  # True Negatives
+FP <- conf_matrix_anc$table[2, 1]  # False Positives
+FN <- conf_matrix_anc$table[1, 2]  # False Negatives
+
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+sensitivity <- TP / (TP + FN)
+specificity <- TN / (TN + FP)
+ppv <- TP / (TP + FP)  # Positive Predictive Value
+npv <- TN / (TN + FN)  # Negative Predictive Value
+
+# Print key metrics
+cat("Accuracy:", round(accuracy, 3), "\n")
+cat("Sensitivity:", round(sensitivity, 3), "\n")
+cat("Specificity:", round(specificity, 3), "\n")
+cat("Positive Predictive Value:", round(ppv, 3), "\n")
+cat("Negative Predictive Value:", round(npv, 3), "\n")
+```
+# Delivery
+```{r Delivery stepwise backwards}
+# Create a complete cases dataset for delivery analysis
+complete_data_delivery <- na.omit(data[, c("location_childbirth_category", "education_category", 
+                                  "parity_category", "delivery_payment_category", 
+                                  "parted_category", "male_category", 
+                                  "ethnic_category", "pci_new", "partocc_category")])
+
+# Check how many rows remain after removing missing values
+print(paste("Original data rows:", nrow(data)))
+print(paste("Complete data rows for delivery analysis:", nrow(complete_data_delivery)))
+
+# Create the full model with all potential predictors from your multivariate analysis
+delivery_full_model <- glm(location_childbirth_category ~ education_category + parity_category + 
+                         delivery_payment_category + parted_category + 
+                         male_category + ethnic_category + pci_new + partocc_category,
+                         family = binomial(link = "logit"), 
+                         data = complete_data_delivery)
+
+# Summary of the full model
+summary(delivery_full_model)
+
+# Check for multicollinearity
+vif(delivery_full_model)
+
+# Perform backward stepwise elimination using AIC criterion
+delivery_backward_model <- step(delivery_full_model, direction = "backward", trace = TRUE)
+
+# Summary of the final model
+summary(delivery_backward_model)
+
+# Calculate odds ratios and confidence intervals for the final model
+exp(cbind(OR = coef(delivery_backward_model), confint(delivery_backward_model)))
+```
+# PNC
+```{r PNC stepwise backwards}
+# Create a complete cases dataset for PNC analysis
+complete_data_pnc <- na.omit(data[, c("pnc_binary", "occupation_category", 
+                                "pnc_place_category", "transport_category", 
+                                "age_first_childbirth", "parted_category")])
+
+# Check how many rows remain after removing missing values
+print(paste("Original data rows:", nrow(data)))
+print(paste("Complete data rows for PNC analysis:", nrow(complete_data_pnc)))
+
+# Create the full model with all potential predictors from your multivariate analysis
+pnc_full_model <- glm(pnc_binary ~ occupation_category + pnc_place_category + 
+                     transport_category + age_first_childbirth + parted_category,
+                     family = binomial(link = "logit"), 
+                     data = complete_data_pnc)
+
+# Summary of the full model
+summary(pnc_full_model)
+
+# Check for multicollinearity
+vif(pnc_full_model)
+
+# Perform backward stepwise elimination using AIC criterion
+pnc_backward_model <- step(pnc_full_model, direction = "backward", trace = TRUE)
+
+# Summary of the final model
+summary(pnc_backward_model)
+
+# Calculate odds ratios and confidence intervals for the final model
+exp(cbind(OR = coef(pnc_backward_model), confint(pnc_backward_model)))
+```
+```{r}
+sessionInfo()
+```
+
+
+
+
+
